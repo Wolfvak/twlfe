@@ -1,0 +1,30 @@
+#ifndef DEVFS_H__
+#define DEVFS_H__
+
+#include "err.h"
+#include "vfs.h"
+
+#define DEVFS_DIR_OPEN_POISON ((void*)0xABCD9876)
+
+typedef struct devfs_entry_t {
+	const char *name;
+	void *priv;
+	off_t size;
+	off_t pos;
+	int mode;
+	int state;
+} devfs_entry_t;
+
+typedef struct devfs_t {
+	devfs_entry_t *dev_entry;
+	size_t n_entries;
+	const char *label;
+	const char *serial;
+	off_t (*dev_read)(devfs_entry_t *dev_entry, void *buf, off_t size);
+	off_t (*dev_write)(devfs_entry_t *dev_entry, const void *buf, off_t size);
+	void *priv;
+} devfs_t;
+
+int devfs_mount(char drive, devfs_t *devfs);
+
+#endif /* DEVFS_H__ */
