@@ -24,11 +24,10 @@ static devfs_entry_t memfs_entries[] = {
     {.name = "itcm", .priv = (void*)0x00000000, .size = 1<<15, .mode = VFS_RO},
     {.name = "mram", .priv = (void*)0x02000000, .size = 1<<22, .mode = VFS_RO},
 };
-static devfs_t memfs = {
+static const devfs_t memfs = {
     .dev_entry = memfs_entries,
     .n_entries = sizeof(memfs_entries)/sizeof(*memfs_entries),
     .label = "Memory",
-    .serial = "N/A",
     .dev_read = memfs_read,
     .dev_write = memfs_write,
 };

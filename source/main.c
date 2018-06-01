@@ -1,39 +1,53 @@
 #include <nds.h>
 #include <stdio.h>
 
-#include <nds/arm9/dldi.h>
-#include <nds/disc_io.h>
-
 #include "err.h"
 #include "vfs.h"
 
-void memfs_init(void);
+#include "wrap.h"
+
+int fat_mount(char drive, size_t dev);
+int mount_ramimg(char drive);
 
 int main(void) {
-	char bios_buf[1024];
-	file_t bios_file;
-	dir_t memfs_root;
-	dirent_t memfs_dirfile;
+	char buf[64];
+	int res, fd;
 
+	defaultExceptionHandler();
 	consoleDemoInit();
-	memfs_init();
 
-	iprintf("vfs_diropen = %d\n", vfs_diropen(&memfs_root, "S:/"));
-	vfs_dirnext_clr(&memfs_root, &memfs_dirfile);
+	iprintf("Mounting RAMIMG... %d\n", mount_ramimg('A'));
 
-	while(!IS_ERR(vfs_dirnext(&memfs_root, &memfs_dirfile)))
-		iprintf("\"%s\"\n", memfs_dirfile.path);
+	fd = vfs_open("A:/text_file.txt", VFS_RO);
+	iprintf("vfs_open: %s\n", err_getstr(fd));
+	if (!IS_ERR(fd)) {
+		memset(buf, 0, 64);
+		iprintf("vfs_read: %llu\n", vfs_read(fd, buf, 63));
 
-	iprintf("vfs_dirclose = %d\n", vfs_dirclose(&memfs_root));
+		iprintf("\"%s\"\n", buf);
 
-	iprintf("vfs_open = %d\n", vfs_open(&bios_file, "S:/bios", VFS_RO));
-	iprintf("vfs_seek max = %llu\n", vfs_seek(&bios_file, 1000000));
-	iprintf("vfs_seek min = %llu\n", vfs_seek(&bios_file, -1000000));
+		res = vfs_close(fd);
+		iprintf("vfs_close: %s\n", err_getstr(res));
+	}
 
-	iprintf("vfs_read = %llu\n", vfs_read(&bios_file, bios_buf, 1024));
-	iprintf("vfs_unmount = %d\n", vfs_unmount('S'));
-	iprintf("vfs_close = %d\n", vfs_close(&bios_file));
-	iprintf("vfs_unmount = %d\n", vfs_unmount('S'));
+	res = vfs_mkdir("A:/test");
+	iprintf("vfs_mkdir: %s\n", err_getstr(res));
+
+	fd = vfs_open("A:/test/test.bin", VFS_RW | VFS_CREATE);
+	iprintf("vfs_open w/ create: %s\n", err_getstr(fd));
+	if (!IS_ERR(fd)) {
+		memset(buf, 0, sizeof(buf));
+		memset(buf, 'A', 8);
+		iprintf("vfs_write (8): %llu\n", vfs_write(fd, buf, 8));
+
+		iprintf("vfs_size: %llu\n", vfs_size(fd));
+		iprintf("vfs_rewind: %llu\n", vfs_seek(fd, -8));
+		iprintf("vfs_read (8): %llu\n", vfs_read(fd, buf, 8));
+		iprintf("buffer: %s\n", buf);
+
+		res = vfs_close(fd);
+		iprintf("vfs_close: %s\n", err_getstr(res));
+	}
 
 	while(1) {
 		swiWaitForVBlank();
