@@ -10,8 +10,8 @@ typedef struct devfs_entry_t {
 	const char *name;
 	int flags;
 	off_t size;
-	off_t pos;
 
+	vf_t *vf;
 	void *priv;
 } devfs_entry_t;
 

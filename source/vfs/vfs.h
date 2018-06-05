@@ -31,6 +31,7 @@ typedef struct {
 typedef struct {
 	mount_t *mnt;	/**< Mount drive */
 	int flags;		/**< Entity flags */
+	off_t pos;		/**< File position / directory read iterator */
 
 	void *priv;
 } vf_t;
@@ -48,12 +49,12 @@ typedef struct {
 
 	int (*open)(mount_t *mnt, vf_t *file, const char *path, int mode);
 	int (*close)(mount_t *mnt, vf_t *file);
+
 	int (*unlink)(mount_t *mnt, const char *path);
 	int (*rename)(mount_t *mnt, const char *oldp, const char *newp);
 
 	off_t (*read)(mount_t *mnt, vf_t *file, void *buf, off_t size);
 	off_t (*write)(mount_t *mnt, vf_t *file, const void *buf, off_t size);
-	off_t (*seek)(mount_t *mnt, vf_t *file, off_t off);
 	off_t (*size)(mount_t *mnt, vf_t *file);
 
 	int (*mkdir)(mount_t *mnt, const char *path);
@@ -86,7 +87,7 @@ int vfs_rename(const char *oldp, const char *newp);
 
 off_t vfs_read(int fd, void *buf, off_t size);
 off_t vfs_write(int fd, const void *buf, off_t size);
-off_t vfs_seek(int fd, off_t off);
+off_t vfs_seek(int fd, off_t off, int whence);
 off_t vfs_size(int fd);
 
 int vfs_mkdir(const char *path);

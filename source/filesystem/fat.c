@@ -157,6 +157,7 @@ off_t fat_vfs_read(mount_t *mnt, vf_t *file, void *buf, off_t size)
 {
 	size_t br;
 	FIL *ff_file = file->priv;
+	f_lseek(ff_file, file->pos);
 	f_read(ff_file, buf, size, &br);
 	return br;
 }
@@ -165,18 +166,9 @@ off_t fat_vfs_write(mount_t *mnt, vf_t *file, const void *buf, off_t size)
 {
 	size_t br;
 	FIL *ff_file = file->priv;
+	f_lseek(ff_file, file->pos);
 	f_write(ff_file, buf, size, &br);
 	return br;
-}
-
-off_t fat_vfs_seek(mount_t *mnt, vf_t *file, off_t off)
-{
-	FIL *ff_file = file->priv;
-	off_t fpos = f_tell(ff_file) + off;
-
-	if (fpos < 0) fpos = 0;
-	f_lseek(ff_file, fpos);
-	return f_tell(ff_file);
 }
 
 off_t fat_vfs_size(mount_t *mnt, vf_t *file)
@@ -263,12 +255,12 @@ static const vfs_ops_t fat_ops = {
 
 	.open = fat_vfs_open,
 	.close = fat_vfs_close,
+
 	.unlink = fat_vfs_unlink,
 	.rename = fat_vfs_rename,
 
 	.read = fat_vfs_read,
 	.write = fat_vfs_write,
-	.seek = fat_vfs_seek,
 	.size = fat_vfs_size,
 
 	.mkdir = fat_vfs_mkdir,

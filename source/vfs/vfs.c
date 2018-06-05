@@ -145,8 +145,9 @@ int vfs_open(const char *path, int mode)
 	if (file == NULL) return -ERR_MEM;
 
 	/* set up the file structure with the corresponding data */
-	file->flags = VFS_OPEN | VFS_FILE | mode;
 	file->mnt = mnt;
+	file->pos = 0;
+	file->flags = VFS_OPEN | VFS_FILE | mode;
 
 	/* call the open operation, inc actives if successful */
 	res = ops->open(mnt, file, lp, mode);
@@ -232,6 +233,7 @@ off_t vfs_read(int fd, void *buf, off_t size)
 	const vfs_ops_t *ops;
 	mount_t *mnt;
 	vf_t *file;
+	off_t rb;
 
 	/* sanity checks */
 	if (!_vfs_valid_vfd(fd) || size <= 0) return -ERR_ARG;
@@ -247,7 +249,9 @@ off_t vfs_read(int fd, void *buf, off_t size)
 	/* if the file wasn't opened with read access
 	 * don't even try */
 	if (!_vfs_ent_readable(file)) return -ERR_ARG;
-	return ops->read(mnt, file, buf, size);
+	rb = ops->read(mnt, file, buf, size);
+	if (!IS_ERR(rb)) file->pos += rb;
+	return rb;
 }
 
 off_t vfs_write(int fd, const void *buf, off_t size)
@@ -256,6 +260,7 @@ off_t vfs_write(int fd, const void *buf, off_t size)
 	const vfs_ops_t *ops;
 	mount_t *mnt;
 	vf_t *file;
+	off_t wb;
 
 	if (buf == NULL) return -ERR_MEM;
 	if (!_vfs_valid_vfd(fd) || size <= 0) return -ERR_ARG;
@@ -268,25 +273,48 @@ off_t vfs_write(int fd, const void *buf, off_t size)
 	if (ops->write == NULL) return -ERR_UNSUPP;
 
 	if (!_vfs_ent_writable(file)) return -ERR_ARG;
-	return ops->write(mnt, file, buf, size);
+	wb = ops->write(mnt, file, buf, size);
+	if (!IS_ERR(wb)) file->pos += wb;
+	return wb;
 }
 
-off_t vfs_seek(int fd, off_t off)
+off_t vfs_seek(int fd, off_t off, int whence)
 {
-	const vfs_ops_t *ops;
-	mount_t *mnt;
 	vf_t *file;
+	off_t pos, size;
 
 	if (!_vfs_valid_vfd(fd)) return -ERR_MEM;
 
 	file = &vfds[fd];
 	if (!_vfs_ent_opened(file) || !_vfs_ent_file(file)) return -ERR_NOTREADY;
 
-	mnt = file->mnt;
-	ops = mnt->ops;
-	if (ops->seek == NULL) return -ERR_UNSUPP;
+	size = vfs_size(fd);
+	if (IS_ERR(size)) return size;
 
-	return ops->seek(mnt, file, off);
+	switch(whence) {
+		case SEEK_SET:
+			pos = off;
+			break;
+
+		case SEEK_CUR:
+			pos = file->pos + off;
+			break;
+
+		case SEEK_END:
+			pos = size + off;
+			break;
+
+		default:
+			return -ERR_ARG;
+	}
+
+	if (pos > size)
+		pos = size;
+	else if (pos < 0)
+		pos = 0;
+
+	file->pos = pos;
+	return pos;
 }
 
 off_t vfs_size(int fd)
@@ -349,6 +377,7 @@ int vfs_diropen(const char *path)
 	if (dir == NULL) return -ERR_MEM;
 
 	dir->mnt = mnt;
+	dir->pos = 0;
 	dir->flags = VFS_OPEN | VFS_DIR;
 
 	res = ops->diropen(mnt, dir, lp);
@@ -391,6 +420,7 @@ int vfs_dirnext(int dd, dirinf_t *next)
 	const vfs_ops_t *ops;
 	mount_t *mnt;
 	vf_t *dir;
+	int ret;
 
 	if (next == NULL) return -ERR_MEM;
 	if (!_vfs_valid_vfd(dd)) return -ERR_ARG;
@@ -403,5 +433,7 @@ int vfs_dirnext(int dd, dirinf_t *next)
 	if (ops->dirnext == NULL) return -ERR_UNSUPP;
 
 	/* 'jump' to the next directory */
-	return ops->dirnext(mnt, dir, next);
+	ret = ops->dirnext(mnt, dir, next);
+	if (!IS_ERR(ret)) dir->pos++;
+	return ret;
 }

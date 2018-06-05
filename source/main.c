@@ -30,7 +30,7 @@ int main(void) {
 	defaultExceptionHandler();
 	consoleDemoInit();
 
-	iprintf("Mounting RAMIMG... %d\n", mount_ramimg('A'));
+	iprintf("Mounting RAMIMG... %d\n", memfs_init('A'));
 
 	fd = vfs_open("A:/text_file.txt", VFS_RO);
 	iprintf("vfs_open: %s\n", err_getstr(fd));
@@ -63,7 +63,7 @@ int main(void) {
 		iprintf("vfs_write (8): %llu\n", vfs_write(fd, buf, 8));
 
 		iprintf("vfs_size: %llu\n", vfs_size(fd));
-		iprintf("vfs_rewind: %llu\n", vfs_seek(fd, -100000));
+		iprintf("vfs_rewind: %llu\n", vfs_seek(fd, 0, SEEK_SET));
 		iprintf("vfs_read (8): %llu\n", vfs_read(fd, buf, 8));
 		iprintf("buffer: %s\n", buf);
 

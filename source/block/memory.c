@@ -7,14 +7,14 @@
 
 off_t memfs_read(devfs_entry_t *entry, void *buf, off_t size)
 {
-    uintptr_t src = (uintptr_t)entry->priv + entry->pos;
+    uintptr_t src = (uintptr_t)entry->priv + entry->vf->pos;
     memcpy(buf, (void*)src, size);
     return size;
 }
 
 off_t memfs_write(devfs_entry_t *entry, const void *buf, off_t size)
 {
-    uintptr_t dst = (uintptr_t)entry->priv + entry->pos;
+    uintptr_t dst = (uintptr_t)entry->priv + entry->vf->pos;
     memcpy((void*)dst, buf, size);
     return size;
 }

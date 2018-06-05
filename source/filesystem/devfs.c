@@ -42,7 +42,7 @@ int devfs_vfs_open(mount_t *mnt, vf_t *file, const char *path, int mode)
 
 	/* reset the position */
 	dev_entry->flags |= VFS_OPEN;
-	dev_entry->pos = 0;
+	dev_entry->vf = file;
 
 	/* mark the file entry index within the devfs */
 	DEVFS_FIDX_SET(file, fidx);
@@ -60,6 +60,7 @@ int devfs_vfs_close(mount_t *mnt, vf_t *file)
 
 	/* mark as "not open" */
 	dev_entry->flags &= ~VFS_OPEN;
+	dev_entry->vf = NULL;
 	DEVFS_FIDX_SET(file, -1);
 	return 0;
 }
@@ -71,12 +72,11 @@ off_t devfs_vfs_read(mount_t *mnt, vf_t *file, void *buf, off_t size)
 	off_t rb = size;
 
 	/* clamp the position to bounds */
-	if ((dev_entry->pos + rb) > dev_entry->size)
-		rb = dev_entry->size - dev_entry->pos;
+	if ((file->pos + rb) > dev_entry->size)
+		rb = dev_entry->size - file->pos;
 
-	/* read from the device and increase the position */
+	/* read from the device */
 	rb = (dfs->dev_read)(dev_entry, buf, rb);
-	dev_entry->pos += rb;
 	return rb;
 }
 
@@ -87,29 +87,11 @@ off_t devfs_vfs_write(mount_t *mnt, vf_t *file, const void *buf, off_t size)
 	devfs_entry_t *dev_entry = &dfs->dev_entry[DEVFS_FIDX_GET(file)];
 	off_t wb = size;
 
-	if ((dev_entry->pos + wb) > dev_entry->size)
-		wb = dev_entry->size - dev_entry->pos;
+	if ((file->pos + wb) > dev_entry->size)
+		wb = dev_entry->size - file->pos;
 
 	wb = (dfs->dev_write)(dev_entry, buf, wb);
-	dev_entry->pos += wb;
 	return wb;
-}
-
-off_t devfs_vfs_seek(mount_t *mnt, vf_t *file, off_t off)
-{
-	devfs_t *dfs = mnt->priv;
-	devfs_entry_t *dev_entry = &dfs->dev_entry[DEVFS_FIDX_GET(file)];
-
-	/* seek (forwards or backwards, depends on off) and clamp down to bounds */
-	off_t pos = dev_entry->pos + off;
-	if (pos > dev_entry->size)
-		pos = dev_entry->size;
-	else if (pos < 0)
-		pos = 0;
-
-	dev_entry->pos = pos;
-
-	return pos;
 }
 
 off_t devfs_vfs_size(mount_t *mnt, vf_t *file)
@@ -123,7 +105,6 @@ int devfs_vfs_diropen(mount_t *mnt, vf_t *dir, const char *path)
 {
 	/* only dir available is root, for now at least */
     if (strcmp(path, "")) return -ERR_NOTFOUND;
-    DEVFS_FIDX_SET(dir, 0);
     return 0;
 }
 
@@ -135,14 +116,13 @@ int devfs_vfs_dirclose(mount_t *mnt, vf_t *dir)
 int devfs_vfs_dirnext(mount_t *mnt, vf_t *dir, dirinf_t *next)
 {
 	devfs_t *dfs = mnt->priv;
-    size_t idx = DEVFS_FIDX_GET(dir);
+    size_t idx = dir->pos;
 
     /* past the last file return an error */
     if (idx >= dfs->n_entries) return -ERR_NOTFOUND;
 
     strcpy(next->path, dfs->dev_entry[idx].name);
     next->flags = dfs->dev_entry[idx].flags;
-    DEVFS_FIDX_SET(dir, idx + 1);
     return 0;
 }
 
@@ -152,12 +132,12 @@ static const vfs_ops_t devfs_ops = {
 
 	.open = devfs_vfs_open,
 	.close = devfs_vfs_close,
+
 	.unlink = NULL,
 	.rename = NULL,
 
 	.read = devfs_vfs_read,
 	.write = devfs_vfs_write,
-	.seek = devfs_vfs_seek,
 	.size = devfs_vfs_size,
 
 	.mkdir = NULL,
