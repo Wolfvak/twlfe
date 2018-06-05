@@ -1,6 +1,8 @@
 #ifndef DEVFS_H__
 #define DEVFS_H__
 
+#include <nds.h>
+
 #include "err.h"
 #include "vfs.h"
 

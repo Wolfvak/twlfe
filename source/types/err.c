@@ -1,4 +1,4 @@
-#include <stddef.h>
+#include <nds.h>
 
 #include "err.h"
 
@@ -12,11 +12,15 @@ static const char *errstr[] = {
 	[ERR_NOTFOUND]	= "path not found",
 	[ERR_UNSUPP]	= "unsupported operation",
 };
+static const size_t errstr_c = sizeof(errstr)/sizeof(*errstr);
 
 const char *err_getstr(int err)
 {
-	if (err < 0)
-		return errstr[-err];
+	if (!IS_ERR(err))
+		return "no error";
 
-	return "no error";
+	if (-err >= errstr_c)
+		return "unknown error";
+
+	return errstr[-err];
 }

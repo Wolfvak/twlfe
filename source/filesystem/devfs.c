@@ -1,8 +1,9 @@
-#include <string.h>
+#include <nds.h>
 
-#include "devfs.h"
 #include "err.h"
 #include "vfs.h"
+
+#include "devfs.h"
 
 #define DEVFS_FIDX_SET(f,s)	do{(f)->priv = (void*)(s);}while(0)
 #define DEVFS_FIDX_GET(f)	(((size_t)(f)->priv))

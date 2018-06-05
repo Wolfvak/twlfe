@@ -1,8 +1,8 @@
+#include <nds.h>
+
 #include "err.h"
 #include "vfs.h"
 #include "vfs_help.h"
-
-#include <string.h>
 
 static mount_t mounts[VFS_MOUNTPOINTS];
 static vf_t vfds[MAX_FILES];

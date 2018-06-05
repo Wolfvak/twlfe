@@ -1,9 +1,9 @@
 #include <nds.h>
-#include <stdio.h>
 
-#include "devfs.h"
 #include "err.h"
 #include "vfs.h"
+
+#include "devfs.h"
 
 off_t memfs_read(devfs_entry_t *entry, void *buf, off_t size)
 {

@@ -1,6 +1,8 @@
 #ifndef ERR_H__
 #define ERR_H__
 
+#include <nds.h>
+
 enum {
 	ERR_NONE = 0,
 	ERR_ARG,		/**< Invalid argument */

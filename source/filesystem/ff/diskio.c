@@ -6,11 +6,11 @@
 /* This is an example of glue functions to attach various exsisting      */
 /* storage control modules to the FatFs module with a defined API.       */
 /*-----------------------------------------------------------------------*/
+#include <nds.h>
 
 #include "diskio.h"		/* FatFs lower layer API */
 
 #include "fat.h"
-#include <stddef.h>
 
 /*-----------------------------------------------------------------------*/
 /* Get Drive Status                                                      */

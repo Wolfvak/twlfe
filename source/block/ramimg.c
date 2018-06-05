@@ -1,16 +1,10 @@
-#include <stdint.h>
-#include <string.h>
+#include <nds.h>
 
 #include "err.h"
+#include "vfs.h"
+
 #include "ff.h"
 #include "fat.h"
-#include "wrap.h"
-
-#include "diskio.h"
-
-#include <nds.h>
-#include <stdio.h>
-
 #include "fatdata_bin.h"
 
 int fat_mount(char drive, const fat_disk_ops *disk_ops);

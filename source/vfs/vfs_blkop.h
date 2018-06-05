@@ -1,8 +1,9 @@
-
 #include <nds.h>
+
+#include "err.h"
 #include "vfs.h"
 
-typedef off_t (*vfs_blk_cb)(off_t blk_len, void *buf, void *priv);
+typedef int (*vfs_blk_cb)(off_t blk_len, void *buf, void *priv);
 
 typedef struct {
 	int fd;

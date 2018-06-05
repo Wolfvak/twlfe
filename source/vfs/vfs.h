@@ -1,9 +1,6 @@
 #ifndef VFS_H__
 #define VFS_H__
 
-#include <stddef.h>
-#include <stdint.h>
-
 #include <nds.h>
 
 #define MAX_PATH	(255)

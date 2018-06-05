@@ -1,22 +1,17 @@
-#include <stdint.h>
-
-#include "err.h"
-#include "ff.h"
-#include "fat.h"
-#include "vfs.h"
-
-#include "diskio.h"
-
 #include <nds.h>
 #include <stdio.h>
 
-typedef struct {
+#include "err.h"
+#include "vfs.h"
+
+#include "ff.h"
+#include "fat.h"
+
+struct {
 	FATFS fs;
 	const fat_disk_ops *disk_ops;
 	int mounted;
-} fat_mount_t;
-
-static fat_mount_t fat_info[FF_MAX_DISK];
+} fat_info[FF_MAX_DISK];
 
 #define FF_LOG_PATH(x)	((char[]){'0' + (x), ':', '\0'})
 #define FF_GET_IDX(x)	((size_t)((x)->priv))

@@ -1,6 +1,11 @@
 #ifndef FAT_H__
 #define FAT_H__
 
+#include <nds.h>
+
+#include "err.h"
+#include "vfs.h"
+
 #define FAT_SECT_SIZE	((off_t)512ULL)
 #define FF_MAX_DISK 	(10)
 
