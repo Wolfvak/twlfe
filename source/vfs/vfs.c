@@ -26,7 +26,7 @@ static int _vfs_actives(char drv)
 	return (idx < 0) ? -1 : mounts[idx].acts;
 }
 
-static void _vfs_reset(char drv)
+static void _vfs_reset_mount(char drv)
 {
 	mount_t *mnt = _vfs_mount(drv);
 	memset(mnt, 0, sizeof(*mnt));
@@ -61,8 +61,14 @@ void __attribute__((constructor)) __vfs_ctor(void)
 {
 	memset(vfds, 0, sizeof(vfds));
 	vfds_c = 0;
-	for (int i = VFS_FIRSTMOUNT; i <= VFS_LASTMOUNT; i++)
-		_vfs_reset(i);
+	for (int i = VFS_FIRSTMOUNT; i < VFS_LASTMOUNT; i++)
+		_vfs_reset_mount(i);
+}
+
+int vfs_state(char drive)
+{
+	if (!_vfs_mounted(drive)) return -ERR_ARG;
+	return _vfs_actives(drive);
 }
 
 int vfs_mount(char drive, const mount_t *mnt_data)
@@ -84,11 +90,10 @@ int vfs_mount(char drive, const mount_t *mnt_data)
 
 	/* call the mount operation */
 	res = ops->mount(mnt);
-	if (IS_ERR(res)) {
-		_vfs_reset(drive);
-	} else {
+	if (IS_ERR(res))
+		_vfs_reset_mount(drive);
+	else
 		mnt->acts = 0;
-	}
 
 	return res;
 }
@@ -109,7 +114,7 @@ int vfs_unmount(char drive)
 	if (ops->unmount == NULL) return -ERR_UNSUPP;
 	res = ops->unmount(mnt);
 	if (!IS_ERR(res))
-		_vfs_reset(drive);
+		_vfs_reset_mount(drive);
 
 	return res;
 }
@@ -200,6 +205,28 @@ int vfs_unlink(const char *path)
 	return ops->unlink(mnt, lp);
 }
 
+int vfs_rename(const char *oldp, const char *newp)
+{
+	const vfs_ops_t *ops;
+	const char *lop, *lnp;
+	mount_t *mnt;
+
+	if (oldp == NULL || newp == NULL) return -ERR_MEM;
+	if (*oldp != *newp) return -ERR_UNSUPP;
+
+	if (!_vfs_mounted(*oldp)) return -ERR_NOTREADY;
+
+	lop = _vfs_get_lpath(oldp);
+	lnp = _vfs_get_lpath(newp);
+	if (!_vfs_check_lpath(lop) || !_vfs_check_lpath(lnp)) return -ERR_ARG;
+
+	mnt = _vfs_mount(*oldp);
+	ops = mnt->ops;
+	if (ops->rename == NULL) return -ERR_UNSUPP;
+
+	return ops->rename(mnt, lop, lnp);
+}
+
 off_t vfs_read(int fd, void *buf, off_t size)
 {
 	const vfs_ops_t *ops;
@@ -207,7 +234,7 @@ off_t vfs_read(int fd, void *buf, off_t size)
 	vf_t *file;
 
 	/* sanity checks */
-	if (!_vfs_valid_vfd(fd) || size < 0) return -ERR_ARG;
+	if (!_vfs_valid_vfd(fd) || size <= 0) return -ERR_ARG;
 	if (buf == NULL) return -ERR_MEM;
 
 	file = &vfds[fd];
@@ -231,7 +258,7 @@ off_t vfs_write(int fd, const void *buf, off_t size)
 	vf_t *file;
 
 	if (buf == NULL) return -ERR_MEM;
-	if (!_vfs_valid_vfd(fd) || size < 0) return -ERR_ARG;
+	if (!_vfs_valid_vfd(fd) || size <= 0) return -ERR_ARG;
 
 	file = &vfds[fd];
 	if (!_vfs_ent_opened(file) || !_vfs_ent_file(file)) return -ERR_NOTREADY;
@@ -359,7 +386,7 @@ int vfs_dirclose(int dd)
 	return res;
 }
 
-int vfs_dirnext(int dd, dirent_t *next)
+int vfs_dirnext(int dd, dirinf_t *next)
 {
 	const vfs_ops_t *ops;
 	mount_t *mnt;

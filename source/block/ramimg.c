@@ -39,6 +39,7 @@ DWORD ramimg_sectors(void)
 
 static const fat_disk_ops fat_ops = {
 	.online = ramimg_online,
+	.init = ramimg_online,
 	.read = ramimg_read,
 	.write = ramimg_write,
 	.sectors = ramimg_sectors,

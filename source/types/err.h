@@ -4,7 +4,7 @@
 enum {
 	ERR_NONE = 0,
 	ERR_ARG,		/**< Invalid argument */
-	ERR_MEM,		/**< Out of memory / NULL pointer */
+	ERR_MEM,		/**< Out of memory */
 	ERR_DEV,		/**< Invalid device */
 	ERR_IO,			/**< I/O error */
 	ERR_BUSY,		/**< Device is busy */

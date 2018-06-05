@@ -36,11 +36,11 @@ static inline int _vfs_ent_opened(vf_t *v) {
 }
 
 static inline int _vfs_ent_file(vf_t *v) {
-	return (v->flags & VFS_FILE) == VFS_FILE;
+	return (v->flags & VFS_FILE);
 }
 
 static inline int _vfs_ent_dir(vf_t *v) {
-	return (v->flags & VFS_DIR) == VFS_DIR;
+	return (v->flags & VFS_DIR);
 }
 
 static inline int _vfs_ent_readable(vf_t *v) {

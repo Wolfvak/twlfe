@@ -9,17 +9,8 @@
 
 #include "diskio.h"		/* FatFs lower layer API */
 
-static fat_disk_ops disk_ops[10];
-
-void disk_register(BYTE pdrv, const fat_disk_ops *ops)
-{
-	disk_ops[pdrv] = *ops;
-}
-
-void disk_remove(BYTE pdrv)
-{
-	disk_ops[pdrv] = (fat_disk_ops){};
-}
+#include "fat.h"
+#include <stddef.h>
 
 /*-----------------------------------------------------------------------*/
 /* Get Drive Status                                                      */
@@ -29,8 +20,8 @@ DSTATUS disk_status (
 	BYTE pdrv		/* Physical drive nmuber to identify the drive */
 )
 {
-	if (disk_ops[pdrv].online())
-		return RES_OK;
+	const fat_disk_ops *ops = ff_get_disk_ops(pdrv);
+	if (ops != NULL && ops->online()) return RES_OK;
 	return RES_NOTRDY;
 }
 
@@ -44,7 +35,9 @@ DSTATUS disk_initialize (
 	BYTE pdrv				/* Physical drive nmuber to identify the drive */
 )
 {
-	return disk_status(pdrv);
+	const fat_disk_ops *ops = ff_get_disk_ops(pdrv);
+	if (ops != NULL && ops->init()) return RES_OK;
+	return RES_NOTRDY;
 }
 
 
@@ -60,7 +53,10 @@ DRESULT disk_read (
 	UINT count		/* Number of sectors to read */
 )
 {
-	return disk_ops[pdrv].read(buff, sector, count);
+	const fat_disk_ops *ops = ff_get_disk_ops(pdrv);
+	if (ops == NULL) return RES_NOTRDY;
+	if (!ops->read(buff, sector, count)) return RES_OK;
+	return RES_NOTRDY;
 }
 
 
@@ -76,7 +72,10 @@ DRESULT disk_write (
 	UINT count			/* Number of sectors to write */
 )
 {
-	return disk_ops[pdrv].write(buff, sector, count);
+	const fat_disk_ops *ops = ff_get_disk_ops(pdrv);
+	if (ops == NULL) return RES_NOTRDY;
+	if (!ops->write(buff, sector, count)) return RES_OK;
+	return RES_NOTRDY;
 }
 
 
@@ -91,6 +90,9 @@ DRESULT disk_ioctl (
 	void *buff		/* Buffer to send/receive control data */
 )
 {
+	const fat_disk_ops *ops = ff_get_disk_ops(pdrv);
+	if (ops == NULL) return RES_PARERR;
+
 	switch(cmd) {
 		case CTRL_SYNC:
 			break;
@@ -101,7 +103,7 @@ DRESULT disk_ioctl (
 			*(DWORD*)buff = 32768;
 			break;
 		case GET_SECTOR_COUNT:
-			*(DWORD*)buff = disk_ops[pdrv].sectors();
+			*(DWORD*)buff = ops->sectors();
 			break;
 		default:
 			return RES_PARERR;

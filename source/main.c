@@ -6,12 +6,13 @@
 
 #include "wrap.h"
 
-int fat_mount(char drive, size_t dev);
 int mount_ramimg(char drive);
+int memfs_init(char drv);
 
 int main(void) {
 	char buf[64];
 	int res, fd;
+	dirinf_t info;
 
 	defaultExceptionHandler();
 	consoleDemoInit();
@@ -47,6 +48,16 @@ int main(void) {
 
 		res = vfs_close(fd);
 		iprintf("vfs_close: %s\n", err_getstr(res));
+	}
+
+	fd = vfs_diropen("A:/");
+	iprintf("vfs_diropen: %s\n", err_getstr(fd));
+	if (!IS_ERR(fd)) {
+		while(!IS_ERR(vfs_dirnext(fd, &info))) {
+			iprintf("\"%s\"\n", info.path);
+		}
+		res = vfs_dirclose(fd);
+		iprintf("vfs_dirclose: %s\n", err_getstr(res));
 	}
 
 	while(1) {

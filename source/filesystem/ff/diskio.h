@@ -23,16 +23,6 @@ typedef enum {
 	RES_PARERR		/* 4: Invalid Parameter */
 } DRESULT;
 
-typedef struct {
-	int (*online)(void);
-	int (*read)(BYTE *buf, DWORD start, UINT count);
-	int (*write)(const BYTE *buf, DWORD start, UINT count);
-	DWORD (*sectors)(void);
-} fat_disk_ops;
-
-void disk_register(BYTE pdrv, const fat_disk_ops *ops);
-void disk_remove(BYTE pdrv);
-
 /*---------------------------------------*/
 /* Prototypes for disk control functions */
 

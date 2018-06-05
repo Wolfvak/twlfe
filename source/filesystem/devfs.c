@@ -7,14 +7,8 @@
 #define DEVFS_FIDX_SET(f,s)	do{(f)->priv = (void*)(s);}while(0)
 #define DEVFS_FIDX_GET(f)	(((size_t)(f)->priv))
 
-#define DEVFS_DIR_OPEN_POISON ((void*)0xABCD9876)
-
 int devfs_vfs_mount(mount_t *mnt)
 {
-	/* initialize all file states to "not open" */
-	devfs_t *dfs = mnt->priv;
-	for (size_t i = 0; i < dfs->n_entries; i++)
-		dfs->dev_entry[i].state = -1;
 	return 0;
 }
 
@@ -27,28 +21,30 @@ int devfs_vfs_open(mount_t *mnt, vf_t *file, const char *path, int mode)
 {
 	devfs_entry_t *dev_entry;
 	devfs_t *dfs = mnt->priv;
-	size_t idx;
+	size_t fidx;
 
 	/* look for the desired file, return an error if not found
 	 * yes, it's done with a dumb strcasecmp comparison
 	 * deal with it */
-	for (idx = 0; idx < dfs->n_entries; idx++) {
-		if (!strcasecmp(path, dfs->dev_entry[idx].name)) break;
+	for (fidx = 0; fidx < dfs->n_entries; fidx++) {
+		if (!strcasecmp(path, dfs->dev_entry[fidx].name)) break;
 	}
-	if (idx == dfs->n_entries) return -ERR_NOTFOUND;
+	if (fidx == dfs->n_entries) return -ERR_NOTFOUND;
 
-	dev_entry = &dfs->dev_entry[idx];
+	dev_entry = &dfs->dev_entry[fidx];
 
-	/* file is already open */
-	if (dev_entry->state >= 0) return -ERR_BUSY;
+	/* file is already open? */
+	if (dev_entry->flags & VFS_OPEN) return -ERR_BUSY;
 
-	/* set the file as "opened" and reset the position */
-	dev_entry->state = 0;
+	/* tried to open the file with an invalid mode */
+	if ((mode & dev_entry->flags) != mode) return -ERR_ARG;
+
+	/* reset the position */
+	dev_entry->flags |= VFS_OPEN;
 	dev_entry->pos = 0;
 
 	/* mark the file entry index within the devfs */
-	DEVFS_FIDX_SET(file, idx);
-
+	DEVFS_FIDX_SET(file, fidx);
 	return 0;
 }
 
@@ -59,13 +55,11 @@ int devfs_vfs_close(mount_t *mnt, vf_t *file)
 
 	dev_entry = &dfs->dev_entry[DEVFS_FIDX_GET(file)];
 
-	/* file is already not opened? */
-	if (dev_entry->state < 0) return -ERR_BUSY;
+	if (!(dev_entry->flags & VFS_OPEN)) return -ERR_ARG;
 
 	/* mark as "not open" */
-	dev_entry->state = -1;
+	dev_entry->flags &= ~VFS_OPEN;
 	DEVFS_FIDX_SET(file, -1);
-
 	return 0;
 }
 
@@ -107,11 +101,11 @@ off_t devfs_vfs_seek(mount_t *mnt, vf_t *file, off_t off)
 
 	/* seek (forwards or backwards, depends on off) and clamp down to bounds */
 	off_t pos = dev_entry->pos + off;
-	if (pos > dev_entry->size) {
+	if (pos > dev_entry->size)
 		pos = dev_entry->size;
-	} else if (pos < 0) {
+	else if (pos < 0)
 		pos = 0;
-	}
+
 	dev_entry->pos = pos;
 
 	return pos;
@@ -128,35 +122,26 @@ int devfs_vfs_diropen(mount_t *mnt, vf_t *dir, const char *path)
 {
 	/* only dir available is root, for now at least */
     if (strcmp(path, "")) return -ERR_NOTFOUND;
-    dir->priv = DEVFS_DIR_OPEN_POISON;
+    DEVFS_FIDX_SET(dir, 0);
     return 0;
 }
 
 int devfs_vfs_dirclose(mount_t *mnt, vf_t *dir)
 {
-    if (dir->priv != DEVFS_DIR_OPEN_POISON) return -ERR_ARG;
-    dir->priv = NULL;
     return 0;
 }
 
-int devfs_vfs_dirnext(mount_t *mnt, vf_t *dir, dirent_t *next)
+int devfs_vfs_dirnext(mount_t *mnt, vf_t *dir, dirinf_t *next)
 {
 	devfs_t *dfs = mnt->priv;
-    size_t idx;
-
-    /* it doesn't really matter but it's here for correctness anyway */
-    if (dir->priv != DEVFS_DIR_OPEN_POISON) return -ERR_ARG;
-
-    /* if the next path is null then we're at the start of dir loop
-     * fetch the first file, otherwise fetch the next */
-    idx = (next->path == NULL) ? 0 : DEVFS_FIDX_GET(next) + 1;
+    size_t idx = DEVFS_FIDX_GET(dir);
 
     /* past the last file return an error */
     if (idx >= dfs->n_entries) return -ERR_NOTFOUND;
 
-    next->path = dfs->dev_entry[idx].name;
-    next->flags = VFS_FILE; /* always files, no subdirs */
-    DEVFS_FIDX_SET(next, idx);
+    strcpy(next->path, dfs->dev_entry[idx].name);
+    next->flags = dfs->dev_entry[idx].flags;
+    DEVFS_FIDX_SET(dir, idx + 1);
     return 0;
 }
 
@@ -167,6 +152,7 @@ static const vfs_ops_t devfs_ops = {
 	.open = devfs_vfs_open,
 	.close = devfs_vfs_close,
 	.unlink = NULL,
+	.rename = NULL,
 
 	.read = devfs_vfs_read,
 	.write = devfs_vfs_write,
@@ -181,7 +167,7 @@ static const vfs_ops_t devfs_ops = {
 
 int devfs_mount(char drive, devfs_t *devfs)
 {
-	const mount_t mount = {
+	mount_t mount = {
 		.ops = &devfs_ops,
 		.caps = VFS_RW,
 		.info = {
