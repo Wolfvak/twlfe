@@ -8,6 +8,7 @@
 
 int mount_ramimg(char drive);
 int memfs_init(char drv);
+void ui_reset(void);
 
 int block_op_cb(off_t blk_len, void *buf, void *priv)
 {
@@ -27,10 +28,13 @@ int main(void) {
 		.data_len = 1<<20
 	};
 
+	ui_reset();
+	while(1);
+
 	defaultExceptionHandler();
 	consoleDemoInit();
 
-	iprintf("Mounting RAMIMG... %d\n", memfs_init('A'));
+	iprintf("Mounting RAMIMG... %d\n", mount_ramimg('A'));
 
 	fd = vfs_open("A:/text_file.txt", VFS_RO);
 	iprintf("vfs_open: %s\n", err_getstr(fd));
