@@ -7,11 +7,10 @@
 #define CHR_TRANSPARENT	(0x00)
 #define CHR_OPAQUE		(0x01)
 
-#define CHR_HALFBLOCK	(0xB1)
-#define CHR_FULLBLOCK	(0xDB)
-
-#define CHR_VERSEP		(0xBA)
-#define CHR_HORSEP		(0xCD)
+/*
+ * sets the video modes, initializes tiles and palettes
+ */
+void ui_reset(void);
 
 /*
  * displays a formatted message on screen

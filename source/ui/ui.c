@@ -27,9 +27,14 @@ enum {
 };
 
 enum {
-	TOP_SCREEN		= 0,
-	BOTTOM_SCREEN	= 1
+	MAINSCR	= 0,
+	SUBSCR	= 1
 };
+
+#define UI_MSGSCR	(SUBSCR)
+#define UI_ASKSCR	(SUBSCR)
+#define UI_MENUSCR	(SUBSCR)
+#define UI_PROGSCR	(SUBSCR)
 
 static void _ui_init_palette(vu16 *pal)
 {
@@ -75,11 +80,16 @@ static inline void _ui_drawc(int screen, int bg, int c, size_t x, size_t y) {
 	m[y * TFB_WIDTH + x] = c;
 }
 
-static void _ui_tilemap_clr(int screen, int bg)
+static void _ui_tilemap_set(int screen, int bg, int c)
 {
 	vu16 *map = bgGetMapPtr(ui_bg[screen][bg]);
 	for (int i = 0; i < TFB_WIDTH*TFB_HEIGHT; i++)
-		map[i] = CHR_TRANSPARENT;
+		map[i] = c;
+}
+
+static void _ui_tilemap_clr(int screen, int bg)
+{
+	_ui_tilemap_set(screen, bg, CHR_TRANSPARENT);
 }
 
 static int _ui_waitkey(int keymask) {
@@ -154,13 +164,11 @@ static void ui_drawstr(int screen, int bg, const char *str, size_t x, size_t y)
 
 static int ui_drawstr_center(int screen, int bg, const char *str)
 {
-	size_t w, h, x, y;
+	size_t w, h, y;
 
 	_ui_strdim(str, &w, &h);
-
-	x = (TFB_WIDTH - w) / 2;
 	y = (TFB_HEIGHT - h) / 2;
-	ui_drawstr(screen, bg, str, x, y);
+	ui_drawstr(screen, bg, str, (TFB_WIDTH - w) / 2, y);
 	return y + h;
 }
 
@@ -170,18 +178,16 @@ void ui_msg(const char *fmt, ...)
 	char msg[256];
 	size_t y;
 
-	sassert(fmt != NULL, "null format");
-
 	va_start(va, fmt);
 	vsnprintf(msg, 255, fmt, va);
 	va_end(va);
 
 	msg[255] = '\0';
-	y = ui_drawstr_center(TOP_SCREEN, BG_PROM, msg) + 2;
-	ui_drawstr(TOP_SCREEN, BG_PROM, "Press any button to continue", 3, y);
+	y = ui_drawstr_center(UI_MSGSCR, BG_PROM, msg) + 2;
+	ui_drawstr(UI_MSGSCR, BG_PROM, "Press any button to continue", 3, y);
 	_ui_waitkey(KEY_BUTTON);
 
-	_ui_tilemap_clr(TOP_SCREEN, BG_PROM);
+	_ui_tilemap_clr(UI_MSGSCR, BG_PROM);
 }
 
 bool ui_ask(const char *msg)
@@ -189,12 +195,11 @@ bool ui_ask(const char *msg)
 	int key;
 	size_t y;
 
-	sassert(msg != NULL, "null msg");
-
-	y = ui_drawstr_center(TOP_SCREEN, BG_PROM, msg);
-	ui_drawstr(TOP_SCREEN, BG_PROM, "(A) Yes / (B) No", 8, y + 2);
+	_ui_tilemap_set(UI_ASKSCR, BG_PROM, CHR_OPAQUE);
+	y = ui_drawstr_center(UI_ASKSCR, BG_PROM, msg);
+	ui_drawstr(UI_ASKSCR, BG_PROM, "(A) Yes / (B) No", 8, y + 2);
 	key = _ui_waitkey(KEY_A | KEY_B);
-	_ui_tilemap_clr(TOP_SCREEN, BG_PROM);
+	_ui_tilemap_clr(UI_ASKSCR, BG_PROM);
 	return (key & KEY_A) != 0;
 }
 
@@ -204,12 +209,15 @@ int ui_menu(int nopt, const char **opt, const char *msg)
 	size_t msg_w, msg_h, msg_x, maxsw;
 	int opt_y, opt_x, ret;
 
-	_ui_tilemap_clr(TOP_SCREEN, BG_PROM);
+	int winsz, wins, wine;
+	bool redraw;
+
+	_ui_fill(UI_MENUSCR, BG_PROM, CHR_OPAQUE, 0, 0, TFB_WIDTH, TFB_HEIGHT);
 	_ui_strdim(msg, &msg_w, &msg_h);
 	msg_x = (TFB_WIDTH - msg_w) / 2;
 	opt_y = msg_h + 3;
 
-	ui_drawstr(TOP_SCREEN, BG_PROM, msg, msg_x, 1);
+	ui_drawstr(UI_MENUSCR, BG_PROM, msg, msg_x, 1);
 
 	maxsw = 0;
 	for (int i = 0; i < nopt; i++) {
@@ -218,25 +226,67 @@ int ui_menu(int nopt, const char **opt, const char *msg)
 	}
 
 	opt_x = ((TFB_WIDTH - maxsw) / 2) - 2;
-	for (int i = 0; i < nopt; i++)
-		ui_drawstr(TOP_SCREEN, BG_PROM, opt[i], opt_x + 2, opt_y + i);
 
 	ret = 0;
+	winsz = (nopt > 20) ? 20 : nopt;
+	wins = 0;
+	wine = winsz;
+	redraw = true;
 	while(true) {
 		int pressed;
-		for (int i = 0; i < nopt; i++)
-			_ui_drawc(TOP_SCREEN, BG_PROM, (ret==i)?'>':' ', opt_x, opt_y + i);
 
-		pressed = _ui_waitkey(KEY_UP | KEY_DOWN | KEY_A | KEY_B);
-		if (pressed & KEY_UP) ret = (ret + nopt - 1) % nopt;
-		else if (pressed & KEY_DOWN) ret = (ret + 1) % nopt;
-		else if (pressed & KEY_A) break;
-		else if (pressed & KEY_B) {
+		if (redraw) {
+			swiWaitForVBlank();
+			_ui_fill(UI_MENUSCR, BG_PROM, CHR_OPAQUE, opt_x + 2, opt_y, maxsw, winsz);
+			for (int i = 0; i < winsz; i++) {
+				int opti = wins + i;
+				if (opti >= nopt) break;
+				ui_drawstr(UI_MENUSCR, BG_PROM, opt[opti], opt_x + 2, opt_y + i);
+			}
+			redraw = false;
+		}
+
+		for (int i = 0; i < winsz; i++) {
+			int opti = wins + i;
+			_ui_drawc(UI_MENUSCR, BG_PROM, (ret==opti)?'>':' ', opt_x, opt_y + i);
+		}
+
+		pressed = _ui_waitkey(KEY_UP | KEY_DOWN | KEY_LEFT | KEY_RIGHT | KEY_A | KEY_B);
+		if (pressed & KEY_UP) ret--;
+		else if (pressed & KEY_DOWN) ret++;
+
+		if (pressed & KEY_LEFT) {
+			if (ret != wins) ret = wins;
+			else ret--;
+		} else if (pressed & KEY_RIGHT) {
+			if (ret != wine-1) ret = wine-1;
+			else ret++;
+		}
+
+		if (pressed & KEY_A) break;
+		if (pressed & KEY_B) {
 			ret = -1;
 			break;
 		}
+
+		if (ret < 0) ret = nopt-1;
+		if (ret >= nopt) ret = 0;
+
+		if (ret >= wine) {
+			wins = wine;
+			wine += winsz;
+			if (wine > nopt) wine = nopt;
+			redraw = true;
+		}
+
+		if (ret < wins) {
+			wine = wins;
+			wins -= winsz;
+			if (wins < 0) wins = 0;
+			redraw = true;
+		}
 	}
-	_ui_tilemap_clr(TOP_SCREEN, BG_PROM);
+	_ui_tilemap_clr(UI_MENUSCR, BG_PROM);
 	return ret;
 }
 
@@ -247,7 +297,7 @@ void ui_progress(uint64_t cur, uint64_t tot, const char *un, const char *msg)
 	size_t w, h, x, y;
 
 	if (cur > tot) {
-		_ui_tilemap_clr(TOP_SCREEN, BG_INFO);
+		_ui_tilemap_clr(UI_PROGSCR, BG_INFO);
 		return;
 	}
 
@@ -257,27 +307,35 @@ void ui_progress(uint64_t cur, uint64_t tot, const char *un, const char *msg)
 	_ui_strdim(msg, &w, &h);
 
 	x = (TFB_WIDTH - w) / 2;
-	y = ((TFB_HEIGHT - h) / 2) - 2;
+	y = ((TFB_HEIGHT - h) / 2) - 3;
 
-	_ui_fill(TOP_SCREEN, BG_INFO, CHR_OPAQUE, 0, y, TFB_WIDTH, 5);
+	swiWaitForVBlank();
+	_ui_fill(UI_PROGSCR, BG_INFO, CHR_OPAQUE, 0, y, TFB_WIDTH, 3);
 
-	ui_drawstr(TOP_SCREEN, BG_INFO, msg, x, y);
+	ui_drawstr(UI_PROGSCR, BG_INFO, msg, x, y);
 
-	_ui_fill(TOP_SCREEN, BG_INFO, CHR_HORSEP, 0, y + 1, TFB_WIDTH, 1);
-	_ui_fill(TOP_SCREEN, BG_INFO, CHR_HORSEP, 0, y + 3, TFB_WIDTH, 1);
+	_ui_fill(UI_PROGSCR, BG_INFO, CHR_SEPTOP, 0, y + 1, TFB_WIDTH, 1);
+	_ui_fill(UI_PROGSCR, BG_INFO, CHR_SEPBOT, 0, y + 3, TFB_WIDTH, 1);
 
-	_ui_fill(TOP_SCREEN, BG_INFO, CHR_FULLBLOCK, 0, y + 2, barc, 1);
-	_ui_fill(TOP_SCREEN, BG_INFO, CHR_HALFBLOCK, barc, y + 2, TFB_WIDTH - barc, 1);
+	if (barc >= 0) {
+		_ui_drawc(UI_PROGSCR, BG_INFO, CHR_PBARS, 0, y + 2);
+		_ui_fill(UI_PROGSCR, BG_INFO, CHR_PBARM, 1, y + 2, barc - 1, 1);
+		if (barc == TFB_WIDTH)
+			_ui_drawc(UI_PROGSCR, BG_INFO, CHR_PBARE, TFB_WIDTH - 1, y + 2);
+	}
+	_ui_fill(UI_PROGSCR, BG_INFO, CHR_OPAQUE, barc, y + 2, TFB_WIDTH - barc, 1);
 
 	if (un == NULL) un = "";
 
 	prog[31] = '\0';
 	w = snprintf(prog, 31, "%llu/%llu %s (%d%%)", cur, tot, un, per);
-	ui_drawstr(TOP_SCREEN, BG_INFO, prog, (TFB_WIDTH - w) / 2, y + 4);
+	ui_drawstr(UI_PROGSCR, BG_INFO, prog, (TFB_WIDTH - w) / 2, y + 3);
 }
 
 void ui_reset(void)
 {
+	u16 *font_tiles;
+
 	videoSetMode(MODE_0_2D);
 	videoSetModeSub(MODE_0_2D);
 
@@ -286,8 +344,8 @@ void ui_reset(void)
 
 	/* initialize backgrounds */
 	for (int i = 0; i < 4; i++) {
-		ui_bg[TOP_SCREEN][i] = bgInit(i, BgType_Text4bpp, BgSize_T_256x256, i, 4);
-		ui_bg[BOTTOM_SCREEN][i] = bgInitSub(i, BgType_Text4bpp, BgSize_T_256x256, i, 4);
+		ui_bg[MAINSCR][i] = bgInit(i, BgType_Text4bpp, BgSize_T_256x256, i, 4);
+		ui_bg[SUBSCR][i] = bgInitSub(i, BgType_Text4bpp, BgSize_T_256x256, i, 4);
 	}
 
 	/* initialize palettes */
@@ -295,13 +353,19 @@ void ui_reset(void)
 	_ui_init_palette(BG_PALETTE_SUB);
 
 	/* intitialize font tiles */
-	_ui_init_font(font, 256, bgGetGfxPtr(ui_bg[TOP_SCREEN][0]));
-	_ui_init_font(font, 256, bgGetGfxPtr(ui_bg[BOTTOM_SCREEN][0]));
+	font_tiles = malloc(256 * 32);
+	sassert(font_tiles, "this is fine");
+
+	_ui_init_font(font, 256, font_tiles);
+	dmaCopy(font_tiles, bgGetGfxPtr(ui_bg[MAINSCR][0]), 256 * 32);
+	dmaCopy(font_tiles, bgGetGfxPtr(ui_bg[SUBSCR][0]), 256 * 32);
+
+	free(font_tiles);
 
 	/* clear tilemaps */
 	for (int l = 0; l < 4; l++) {
-		_ui_tilemap_clr(TOP_SCREEN, l);
-		_ui_tilemap_clr(BOTTOM_SCREEN, l);
+		_ui_tilemap_clr(MAINSCR, l);
+		_ui_tilemap_clr(SUBSCR, l);
 	}
 
 	/* enable and show all background layers */
@@ -309,18 +373,5 @@ void ui_reset(void)
 		videoBgEnable(i);		
 		videoBgEnableSub(i);
 	}
-
-	for (int i = 0; i < 24; i++)
-		ui_drawstr(TOP_SCREEN, BG_MAIN, "this text should be in BG_MAIN", 0, i);
-
-	for (int i = 0; i < 16; i++) {
-		ui_progress(i, 15, "seconds", "Timer");
-		for (int j = 0; j < 60; j++) swiWaitForVBlank();
-	}
-	ui_progress(1, 0, NULL, NULL);
-
-	ui_msg("got option %d\n",
-		ui_menu(3, (const char*[]){"Option A", "This is Option B", "OptC"}, "Menu Header"));
-
-	while(1) swiWaitForVBlank();
+	return;
 }
