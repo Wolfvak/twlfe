@@ -4,6 +4,15 @@
 #include <nds.h>
 #include <stdarg.h>
 
+#define CHR_TRANSPARENT	(0x00)
+#define CHR_OPAQUE		(0x01)
+
+#define CHR_HALFBLOCK	(0xB1)
+#define CHR_FULLBLOCK	(0xDB)
+
+#define CHR_VERSEP		(0xBA)
+#define CHR_HORSEP		(0xCD)
+
 /*
  * displays a formatted message on screen
  * can exit with any button

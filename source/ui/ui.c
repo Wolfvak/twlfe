@@ -31,16 +31,55 @@ enum {
 	BOTTOM_SCREEN	= 1
 };
 
+static void _ui_init_palette(vu16 *pal)
+{
+	for (int i = 0; i < 15; i++)
+		pal[i] = 0;
+	pal[15] = RGB15(0x1F, 0x1F, 0x1F);
+}
+
+/*
+ * char zero is always a transparent tile
+ * char one is always a full opaque block
+ * everything else is transcoded from the font
+ */
+
+static void _ui_init_font(const unsigned char *font, size_t chars, vu16 *tile)
+{
+	vu32 *tile32 = (vu32*)tile;
+
+	for (int i = 0; i < 8; i++)
+		tile32[i] = 0;
+
+	for (int i = 8; i < 16; i++)
+		tile32[i] = 0x11111111;
+
+	for (size_t i = 2; i < chars; i++) {
+		const unsigned char *current_char = &font[i * 8];
+		vu32 *current_tile = &tile32[i * 8];
+		for (int j = 0; j < 8; j++) {
+			unsigned char c = current_char[j];
+			u32 tile_row = 0x11111111;
+			while(c) {
+				int ctz = (31 - __builtin_clz(c));
+				tile_row |= (0xF << ((7 - ctz) << 2));
+				c &= ~(1 << ctz);
+			}
+			current_tile[j] = tile_row;
+		}
+	}
+}
+
 static inline void _ui_drawc(int screen, int bg, int c, size_t x, size_t y) {
 	vu16 *m = bgGetMapPtr(ui_bg[screen][bg]);
-	m[y * TFB_WIDTH + x] = c - ' ';
+	m[y * TFB_WIDTH + x] = c;
 }
 
 static void _ui_tilemap_clr(int screen, int bg)
 {
 	vu16 *map = bgGetMapPtr(ui_bg[screen][bg]);
 	for (int i = 0; i < TFB_WIDTH*TFB_HEIGHT; i++)
-		map[i] = 0;
+		map[i] = CHR_TRANSPARENT;
 }
 
 static int _ui_waitkey(int keymask) {
@@ -65,30 +104,33 @@ static void _ui_fill(int screen, int bg, int c, size_t x,
 	vu16 *map = bgGetMapPtr(ui_bg[screen][bg]) + (y * TFB_WIDTH);
 	w += x;
 	while(h--) {
-		for (size_t _x = x; _x < w; _x++) {
-			map[_x] = c - ' ';
-		}
+		for (size_t _x = x; _x < w; _x++)
+			map[_x] = c;
 		map += TFB_WIDTH;
 	}
 }
 
 static size_t _ui_strdim(const char *str, size_t *width, size_t *height)
 {
-	size_t slen = strlen(str), mw = 0, w = 0, h = 0;
-	const char *send = str + slen;
-	while(str < send) {
-		if (*str == '\n') {
-			if (w > mw) mw = w;
-			w = 0;
-			h++;
-		} else {
-			w++;
+	const char *strs = str;
+	size_t mw = 0, w = 0, h = 0;
+	while(*str) {
+		switch(*str) {
+			case '\n':
+				mw = (w > mw) ? w : mw;
+				w = 0;
+				h++;
+				break;
+
+			default:
+				w++;
+				break;
 		}
 		str++;
 	}
 	if (width) *width = (w > mw) ? w : mw;
 	if (height) *height = h;
-	return slen;
+	return (str - strs);
 }
 
 static void ui_drawstr(int screen, int bg, const char *str, size_t x, size_t y)
@@ -96,11 +138,15 @@ static void ui_drawstr(int screen, int bg, const char *str, size_t x, size_t y)
 	vu16 *map = bgGetMapPtr(ui_bg[screen][bg]);
 	size_t i = y * TFB_WIDTH + x;
 	while(*str) {
-		if (*str == '\n') {
-			i -= i % TFB_WIDTH;
-			i += TFB_WIDTH + x;
-		} else {
-			map[i++] = *str - ' ';
+		switch(*str) {
+			case '\n':
+				i -= i % TFB_WIDTH;
+				i += TFB_WIDTH + x;
+				break;
+
+			default:
+				map[i++] = *str;
+				break;
 		}
 		str++;
 	}
@@ -198,7 +244,7 @@ void ui_progress(uint64_t cur, uint64_t tot, const char *un, const char *msg)
 {
 	char prog[32];
 	int per, barc;
-	size_t y, w;
+	size_t w, h, x, y;
 
 	if (cur > tot) {
 		_ui_tilemap_clr(TOP_SCREEN, BG_INFO);
@@ -208,13 +254,20 @@ void ui_progress(uint64_t cur, uint64_t tot, const char *un, const char *msg)
 	per = ((cur * 100) / tot);
 	barc = (per * TFB_WIDTH) / 100;
 
-	y = ui_drawstr_center(TOP_SCREEN, BG_INFO, msg);
+	_ui_strdim(msg, &w, &h);
 
-	_ui_fill(TOP_SCREEN, BG_INFO, '-', 0, y + 1, TFB_WIDTH, 1);
-	_ui_fill(TOP_SCREEN, BG_INFO, '-', 0, y + 3, TFB_WIDTH, 1);
+	x = (TFB_WIDTH - w) / 2;
+	y = ((TFB_HEIGHT - h) / 2) - 2;
 
-	_ui_fill(TOP_SCREEN, BG_INFO, '|', 0, y + 2, barc, 1); /* fullblock */
-	_ui_fill(TOP_SCREEN, BG_INFO, ' ', barc, y + 2, TFB_WIDTH - barc, 1); /* halfblock */
+	_ui_fill(TOP_SCREEN, BG_INFO, CHR_OPAQUE, 0, y, TFB_WIDTH, 5);
+
+	ui_drawstr(TOP_SCREEN, BG_INFO, msg, x, y);
+
+	_ui_fill(TOP_SCREEN, BG_INFO, CHR_HORSEP, 0, y + 1, TFB_WIDTH, 1);
+	_ui_fill(TOP_SCREEN, BG_INFO, CHR_HORSEP, 0, y + 3, TFB_WIDTH, 1);
+
+	_ui_fill(TOP_SCREEN, BG_INFO, CHR_FULLBLOCK, 0, y + 2, barc, 1);
+	_ui_fill(TOP_SCREEN, BG_INFO, CHR_HALFBLOCK, barc, y + 2, TFB_WIDTH - barc, 1);
 
 	if (un == NULL) un = "";
 
@@ -233,17 +286,17 @@ void ui_reset(void)
 
 	/* initialize backgrounds */
 	for (int i = 0; i < 4; i++) {
-		ui_bg[0][i] = bgInit(i, BgType_Text4bpp, BgSize_T_256x256, i, 4);
-		ui_bg[1][i] = bgInitSub(i, BgType_Text4bpp, BgSize_T_256x256, i, 4);
+		ui_bg[TOP_SCREEN][i] = bgInit(i, BgType_Text4bpp, BgSize_T_256x256, i, 4);
+		ui_bg[BOTTOM_SCREEN][i] = bgInitSub(i, BgType_Text4bpp, BgSize_T_256x256, i, 4);
 	}
 
-	/* copy palette into ram */
-	dmaCopy(fontPal, BG_PALETTE, fontPalLen);
-	dmaCopy(fontPal, BG_PALETTE_SUB, fontPalLen);
+	/* initialize palettes */
+	_ui_init_palette(BG_PALETTE);
+	_ui_init_palette(BG_PALETTE_SUB);
 
-	/* copy tiles into vram */
-	dmaCopy(fontTiles, bgGetGfxPtr(ui_bg[0][0]), fontTilesLen);
-	dmaCopy(fontTiles, bgGetGfxPtr(ui_bg[1][0]), fontTilesLen);
+	/* intitialize font tiles */
+	_ui_init_font(font, 256, bgGetGfxPtr(ui_bg[TOP_SCREEN][0]));
+	_ui_init_font(font, 256, bgGetGfxPtr(ui_bg[BOTTOM_SCREEN][0]));
 
 	/* clear tilemaps */
 	for (int l = 0; l < 4; l++) {
@@ -257,8 +310,11 @@ void ui_reset(void)
 		videoBgEnableSub(i);
 	}
 
-	for (int i = 0; i < 3; i++) {
-		ui_progress(i, 2, "seconds", "Timer");
+	for (int i = 0; i < 24; i++)
+		ui_drawstr(TOP_SCREEN, BG_MAIN, "this text should be in BG_MAIN", 0, i);
+
+	for (int i = 0; i < 16; i++) {
+		ui_progress(i, 15, "seconds", "Timer");
 		for (int j = 0; j < 60; j++) swiWaitForVBlank();
 	}
 	ui_progress(1, 0, NULL, NULL);
