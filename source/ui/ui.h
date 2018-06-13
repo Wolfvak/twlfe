@@ -4,13 +4,47 @@
 #include <nds.h>
 #include <stdarg.h>
 
+#define KEY_FACE	(KEY_A | KEY_B | KEY_X | KEY_Y)
+#define KEY_DPAD	(KEY_UP | KEY_DOWN | KEY_LEFT | KEY_RIGHT)
+#define KEY_OTHR	(KEY_SELECT | KEY_START | KEY_L | KEY_R)
+#define KEY_STAT	(KEY_TOUCH | KEY_LID)
+
+#define KEY_BUTTON	(KEY_FACE | KEY_DPAD | KEY_OTHR)
+#define KEY_ANY		(KEY_BUTTON  | KEY_STAT)
+
 #define CHR_TRANSPARENT	(0x00)
 #define CHR_OPAQUE		(0x01)
+
+enum {
+	MAINSCR	= 0,
+	SUBSCR	= 1
+};
+
+enum {
+	BG_MAIN	= 3,
+	BG_PROM	= 2,
+	BG_INFO	= 1,
+	BG_ERR	= 0
+};
+
 
 /*
  * sets the video modes, initializes tiles and palettes
  */
 void ui_reset(void);
+
+/*
+ * waits for one of the keys in `keymask` to be pressed
+ * includes key debounce in case the key is already held down
+ */
+int ui_waitkey(int keymask);
+
+void ui_tilemap_clr(int screen, int bg);
+void ui_drawc(int screen, int bg, int c, size_t x, size_t y);
+
+void ui_drawstr(int screen, int bg, const char *str, size_t x, size_t y);
+int ui_drawstr_center(int screen, int bg, const char *str);
+void ui_drawstr_xcenter(int screen, int bg, const char *str, size_t y);
 
 /*
  * displays a formatted message on screen

@@ -8,13 +8,30 @@
 #define DEVFS_FIDX_SET(f,s)	do{(f)->priv = (void*)(s);}while(0)
 #define DEVFS_FIDX_GET(f)	(((size_t)(f)->priv))
 
-int devfs_vfs_mount(mount_t *mnt)
+int devfs_vfs_mount_unmount(mount_t *mnt)
 {
 	return 0;
 }
 
-int devfs_vfs_unmount(mount_t *mnt)
+int devfs_vfs_ioctl(mount_t *mnt, int ctl, vfs_ioctl_t *data)
 {
+	devfs_t *dfs = mnt->priv;
+	switch(ctl) {
+		default:
+			return -ERR_ARG;
+
+		case VFS_IOCTL_SIZE:
+			data->intval = VFS_SIZE_MAX;
+			break;
+
+		case VFS_IOCTL_LABEL:
+			data->strval = dfs->label;
+			break;
+
+		case VFS_IOCTL_ASCII_ICON:
+			data->strval = dfs->icon;
+			break;
+	}
 	return 0;
 }
 
@@ -127,8 +144,9 @@ int devfs_vfs_dirnext(mount_t *mnt, vf_t *dir, dirinf_t *next)
 }
 
 static const vfs_ops_t devfs_ops = {
-	.mount = devfs_vfs_mount,
-	.unmount = devfs_vfs_unmount,
+	.mount = devfs_vfs_mount_unmount,
+	.unmount = devfs_vfs_mount_unmount,
+	.ioctl = devfs_vfs_ioctl,
 
 	.open = devfs_vfs_open,
 	.close = devfs_vfs_close,
@@ -148,14 +166,9 @@ static const vfs_ops_t devfs_ops = {
 
 int devfs_mount(char drive, devfs_t *devfs)
 {
-	mount_t mount = {
+	const mount_t mount = {
 		.ops = &devfs_ops,
 		.caps = VFS_RW,
-		.info = {
-			.size = 0,
-			.label = devfs->label,
-			.serial = "",
-		},
 		.priv = devfs,
 	};
 

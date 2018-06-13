@@ -61,7 +61,7 @@ void __attribute__((constructor)) __vfs_ctor(void)
 {
 	memset(vfds, 0, sizeof(vfds));
 	vfds_c = 0;
-	for (int i = VFS_FIRSTMOUNT; i < VFS_LASTMOUNT; i++)
+	for (int i = VFS_FIRSTMOUNT; i <= VFS_LASTMOUNT; i++)
 		_vfs_reset_mount(i);
 }
 
@@ -117,6 +117,19 @@ int vfs_unmount(char drive)
 		_vfs_reset_mount(drive);
 
 	return res;
+}
+
+int vfs_ioctl(char drive, int ctl, vfs_ioctl_t *data)
+{
+	const vfs_ops_t *ops;
+	mount_t *mnt;
+
+	if (!_vfs_mounted(drive)) return -ERR_NOTREADY;
+	mnt = _vfs_mount(drive);
+	ops = mnt->ops;
+
+	if (ops->ioctl == NULL) return -ERR_UNSUPP;
+	return ops->ioctl(mnt, ctl, data);
 }
 
 int vfs_open(const char *path, int mode)

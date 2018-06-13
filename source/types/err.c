@@ -17,7 +17,7 @@ static const size_t errstr_c = sizeof(errstr)/sizeof(*errstr);
 const char *err_getstr(int err)
 {
 	if (!IS_ERR(err))
-		return "no error";
+		return "ok";
 
 	if (-err >= errstr_c)
 		return "unknown error";

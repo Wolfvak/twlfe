@@ -5,11 +5,8 @@
 
 #include "vfs_blkop.h"
 
-#define BLK_MAX (0x80000)
-
 static void *_vfs_blk_buffer(size_t min, size_t max, size_t *bsz)
 {
-	if (max > BLK_MAX) max = BLK_MAX;
 	void *ret = NULL;
 	do {
 		ret = malloc(max);
@@ -73,10 +70,10 @@ int vfs_blk_write(vfs_blk_op_t *op)
 	rem = op->data_len;
 	while(rem) {
 		blk_sz = (rem > dbuf_len) ? dbuf_len : rem;
+		res = op->cb(blk_sz, dbuf, op->priv);
+		if (IS_ERR(res)) break;
 		wb = vfs_write(op->fd, dbuf, blk_sz);
 		if (IS_ERR(wb)) break;
-		res = op->cb(wb, dbuf, op->priv);
-		if (IS_ERR(res)) break;
 
 		rem -= wb;
 		if (wb != blk_sz) break;

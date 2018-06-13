@@ -9,8 +9,13 @@
 
 struct {
 	FATFS fs;
-	const fat_disk_ops *disk_ops;
 	int mounted;
+
+	const fat_disk_ops *disk_ops;
+	const char *icon;
+
+	char label[16];
+	char serial[16];
 } fat_info[FF_MAX_DISK];
 
 #define FF_LOG_PATH(x)	((char[]){'0' + (x), ':', '\0'})
@@ -95,6 +100,31 @@ int fat_vfs_unmount(mount_t *mnt)
 	}
 
 	return _ff_err(res);
+}
+
+int fat_vfs_ioctl(mount_t *mnt, int ctl, vfs_ioctl_t *data)
+{
+	size_t ff_idx = FF_GET_IDX(mnt);
+	FATFS *fs = &fat_info[ff_idx].fs;
+
+	switch(ctl) {
+		default:
+			return -ERR_ARG;
+
+		case VFS_IOCTL_SIZE:
+			data->intval = (off_t)(fs->n_fatent - 2) * (off_t)(fs->csize) * FAT_SECT_SIZE;
+			break;
+
+		case VFS_IOCTL_LABEL:
+			f_getlabel(FF_LOG_PATH(ff_idx), fat_info[ff_idx].label, NULL);
+			data->strval = fat_info[ff_idx].label;
+			break;
+
+		case VFS_IOCTL_ASCII_ICON:
+			data->strval = fat_info[ff_idx].icon;
+			break;
+	}
+	return 0;
 }
 
 int fat_vfs_open(mount_t *mnt, vf_t *file, const char *path, int mode)
@@ -252,6 +282,7 @@ int fat_vfs_dirnext(mount_t *mnt, vf_t *dir, dirinf_t *next)
 static const vfs_ops_t fat_ops = {
 	.mount = fat_vfs_mount,
 	.unmount = fat_vfs_unmount,
+	.ioctl = fat_vfs_ioctl,
 
 	.open = fat_vfs_open,
 	.close = fat_vfs_close,
@@ -269,7 +300,7 @@ static const vfs_ops_t fat_ops = {
 	.dirnext = fat_vfs_dirnext,
 };
 
-int fat_mount(char drive, const fat_disk_ops *disk_ops)
+int fat_mount(char drive, const fat_disk_ops *disk_ops, const char *icon)
 {
 	int ff_idx = -1;
 	mount_t mount = {
@@ -288,5 +319,6 @@ int fat_mount(char drive, const fat_disk_ops *disk_ops)
 
 	mount.priv = (void*)ff_idx;
 	fat_info[ff_idx].disk_ops = disk_ops;
+	fat_info[ff_idx].icon = icon;
 	return vfs_mount(drive, &mount);
 }

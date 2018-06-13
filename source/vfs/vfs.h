@@ -9,21 +9,20 @@
 #define VFS_FIRSTMOUNT	('A')
 #define VFS_LASTMOUNT	('Z')
 
-#define VFS_MOUNTPOINTS	(VFS_LASTMOUNT - VFS_FIRSTMOUNT)
+#define VFS_MOUNTPOINTS	(VFS_LASTMOUNT - VFS_FIRSTMOUNT + 1)
 
 typedef signed long long off_t;
+#define VFS_SIZE_MAX ((off_t)(~0ULL) >> 1ULL)
 
-typedef struct {
-	off_t size;		/**< Filesystem size in bytes */
-	char *label;	/**< Filesystem label */
-	char *serial;	/**< Filesystem UUID */
-} vfs_info_t;
+typedef union {
+	off_t intval;
+	const char *strval;
+} vfs_ioctl_t;
 
 typedef struct {
 	const void *ops;	/**< Filesystem operations */
 	int caps;			/**< Permitted operations bitmask */
 	int acts;			/**< Active file handles */
-	vfs_info_t info;	/**< Filesystem information */
 
 	void *priv;
 } mount_t;
@@ -46,6 +45,7 @@ typedef struct {
 typedef struct {
 	int (*mount)(mount_t *mnt);
 	int (*unmount)(mount_t *mnt);
+	int (*ioctl)(mount_t *mnt, int ctl, vfs_ioctl_t *data);
 
 	int (*open)(mount_t *mnt, vf_t *file, const char *path, int mode);
 	int (*close)(mount_t *mnt, vf_t *file);
@@ -75,10 +75,18 @@ enum {
 	VFS_DIR		= BIT(5),				/**< Entity is a dir */
 };
 
+enum {
+	VFS_IOCTL_SIZE,
+	VFS_IOCTL_LABEL,
+	VFS_IOCTL_SERIAL,
+	VFS_IOCTL_ASCII_ICON,
+};
+
 int vfs_state(char drive);
 
 int vfs_mount(char drive, const mount_t *mnt);
 int vfs_unmount(char drive);
+int vfs_ioctl(char drive, int ctl, vfs_ioctl_t *data);
 
 int vfs_open(const char *path, int mode);
 int vfs_close(int fd);

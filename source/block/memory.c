@@ -5,6 +5,17 @@
 
 #include "devfs.h"
 
+static const char memfs_icon[] = {
+    "8X8_ICON"
+    "8X8_ICON"
+    "8X8_ICON"
+    "8X8_ICON"
+    "8X8_ICON"
+    "8X8_ICON"
+    "8X8_ICON"
+    "8X8_ICON"
+};
+
 off_t memfs_read(devfs_entry_t *entry, void *buf, off_t size)
 {
     uintptr_t src = (uintptr_t)entry->priv + entry->vf->pos;
@@ -31,6 +42,7 @@ static devfs_t memfs = {
     .dev_entry = memfs_entries,
     .n_entries = sizeof(memfs_entries)/sizeof(*memfs_entries),
     .label = "Memory",
+    .icon = memfs_icon,
     .dev_read = memfs_read,
     .dev_write = memfs_write,
 };

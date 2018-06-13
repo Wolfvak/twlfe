@@ -10,13 +10,13 @@
 #define FF_MAX_DISK 	(10)
 
 typedef struct {
-	int (*online)(void);
 	int (*init)(void);
+	int (*online)(void);
 	int (*read)(BYTE *buf, DWORD start, UINT count);
 	int (*write)(const BYTE *buf, DWORD start, UINT count);
-	DWORD (*sectors)(void);
 } fat_disk_ops;
 
 const fat_disk_ops *ff_get_disk_ops(int disk);
+int fat_mount(char drive, const fat_disk_ops *disk_ops, const char *icon);
 
 #endif /* FAT_H__ */

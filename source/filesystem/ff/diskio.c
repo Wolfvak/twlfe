@@ -55,7 +55,7 @@ DRESULT disk_read (
 {
 	const fat_disk_ops *ops = ff_get_disk_ops(pdrv);
 	if (ops == NULL) return RES_NOTRDY;
-	if (!ops->read(buff, sector, count)) return RES_OK;
+	if (ops->read(buff, sector, count) == 0) return RES_OK;
 	return RES_NOTRDY;
 }
 
@@ -74,7 +74,7 @@ DRESULT disk_write (
 {
 	const fat_disk_ops *ops = ff_get_disk_ops(pdrv);
 	if (ops == NULL) return RES_NOTRDY;
-	if (!ops->write(buff, sector, count)) return RES_OK;
+	if (ops->write(buff, sector, count) == 0) return RES_OK;
 	return RES_NOTRDY;
 }
 
@@ -101,9 +101,6 @@ DRESULT disk_ioctl (
 			break;
 		case GET_BLOCK_SIZE:
 			*(DWORD*)buff = 32768;
-			break;
-		case GET_SECTOR_COUNT:
-			*(DWORD*)buff = ops->sectors();
 			break;
 		default:
 			return RES_PARERR;
