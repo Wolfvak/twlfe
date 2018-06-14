@@ -34,6 +34,6 @@ size_t path_basedir(char *out, const char *path);
  */
 int open_compound_path(int mode, const char *fmt, ...);
 
-size_t size_format(char *out, size_t max, off_t size);
+size_t size_format(char *out, off_t size);
 
 #endif /* VFS_GLUE_H__ */

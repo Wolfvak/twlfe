@@ -69,13 +69,14 @@ char *fe_mount_menu(char *return_path)
 {
 	vu16 *map = ui_map(0, 0);
 	fe_mount_info minf[VFS_MOUNTPOINTS];
-	size_t mcnt = get_mount_info(minf, VFS_MOUNTPOINTS), idx = 0;
+	int mcnt = get_mount_info(minf, VFS_MOUNTPOINTS), idx = 0;
 
 	ui_msgf("%d", mcnt);
 
 	while(true) {
 		int keypress;
-		size_t next_idx, prev_idx;
+		char sizestr[32];
+		int next_idx, prev_idx;
 
 		swiWaitForVBlank();
 		ui_tilemap_clr(map);
@@ -98,8 +99,15 @@ char *fe_mount_menu(char *return_path)
 
 		ui_drawstr_xcenterf(map, 15, "%c:", minf[idx].drv);
 
-		if (*minf[idx].label) ui_drawstr_xcenter(map, 16, minf[idx].label);
-		else ui_drawstr_xcenter(map, 16, "No label");
+		if (*minf[idx].label)
+			ui_drawstr_xcenter(map, 16, minf[idx].label);
+		else
+			ui_drawstr_xcenter(map, 16, "No label");
+
+		strcpy(sizestr, "Size: ");
+		size_format(&sizestr[6], minf[idx].size);
+
+		ui_drawstr_xcenter(map, 17, sizestr);
 
 		keypress = ui_waitkey(KEY_LEFT | KEY_RIGHT | KEY_A | KEY_B);
 

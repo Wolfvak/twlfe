@@ -12,7 +12,7 @@
 #define VFS_MOUNTPOINTS	(VFS_LASTMOUNT - VFS_FIRSTMOUNT + 1)
 
 typedef signed long long off_t;
-#define VFS_SIZE_MAX ((off_t)(~0ULL) >> 1ULL)
+#define VFS_SIZE_MAX ((off_t)0x7FFFFFFFFFFFFFFFULL)
 
 typedef union {
 	off_t intval;

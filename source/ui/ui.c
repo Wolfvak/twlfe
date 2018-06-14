@@ -13,7 +13,7 @@ static int ui_bg[2][4];
 #define UI_MENUSCR	(SUBSCR)
 #define UI_PROGSCR	(SUBSCR)
 
-#define STRBUF_LEN	(256)
+#define STRBUF_LEN	(128)
 
 #define UI_FORMAT_HELPER(f, s) \
 	va_list va; \

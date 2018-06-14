@@ -134,27 +134,27 @@ static const char *format_suf[] = {
 	"B", "KiB", "MiB", "GiB", "TiB", "PiB", "EiB"
 };
 
-size_t size_format(char *out, size_t max, off_t size)
+size_t size_format(char *out, off_t size)
 {
-	size_t size_log2, magnitude, intpart, decpart;
+	size_t size_log2, scale, intpart, decpart;
 
-	if (size == 0 || size < 0) {
+	if (size < 0) {
+		strcpy(out, "negative?");
+		return 0;
+	}
+
+	if (size == 0) {
 		size_log2 = 0;
-	} else if (size < 0x100000000) {
+	} else if ((size_t)(size >> 32) == 0) {
 		size_log2 = (31 - __builtin_clz((size_t)size));
 	} else {
-		size_log2 = (31 - __builtin_clz((size_t)(size >> 32)));
+		size_log2 = (63 - __builtin_clz((size_t)(size >> 32)));
 	}
 
-	magnitude = size_log2 / 10;
+	scale = (size_log2 / 10) * 10;
 
-	intpart = size >> (magnitude * 10);
+	intpart = size >> scale;
+	decpart = ((size - (intpart << scale)) % 1000) / 100;
 
-	decpart = size >> ((magnitude-1) * 10);
-	while(decpart > 100) {
-		decpart /= 10;
-	}
-
-	sprintf(out, "%d.%d %s", intpart, decpart, format_suf[magnitude]);
-	return 0;
+	return sprintf(out, "%d.%d %s", intpart, decpart, format_suf[scale / 10]);
 }
