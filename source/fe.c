@@ -56,9 +56,10 @@ static size_t get_mount_info(fe_mount_info *info, size_t max) {
 
 void fe_draw_icon(const char *icon, size_t x, size_t y)
 {
+	vu16 *map = ui_map(0, 0);
 	for (size_t _y = 0; _y < 8; _y++) {
 		for (size_t _x = 0; _x < 8; _x++) {
-			ui_drawc(FE_SCR, FE_LAYER, *icon, x + _x, y + _y);
+			ui_drawc(map, *icon, x + _x, y + _y);
 			icon++;
 		}
 	}
@@ -66,20 +67,21 @@ void fe_draw_icon(const char *icon, size_t x, size_t y)
 
 char *fe_mount_menu(char *return_path)
 {
+	vu16 *map = ui_map(0, 0);
 	fe_mount_info minf[VFS_MOUNTPOINTS];
 	size_t mcnt = get_mount_info(minf, VFS_MOUNTPOINTS), idx = 0;
 
-	ui_msg("%d", mcnt);
+	ui_msgf("%d", mcnt);
 
 	while(true) {
 		int keypress;
 		size_t next_idx, prev_idx;
 
 		swiWaitForVBlank();
-		ui_tilemap_clr(FE_SCR, FE_LAYER);
+		ui_tilemap_clr(map);
 
 		fe_draw_icon(minf[idx].icon, 12, 4);
-		ui_drawstr(FE_SCR, FE_LAYER, "^^^^^^^^", 12, 13);
+		ui_drawstr(map, 12, 13, "^^^^^^^^");
 
 		if (mcnt > 1) {
 			next_idx = (idx + 1) % mcnt;
@@ -87,20 +89,17 @@ char *fe_mount_menu(char *return_path)
 			fe_draw_icon(minf[next_idx].icon, 23, 4);
 			fe_draw_icon(minf[prev_idx].icon, 1, 4);
 
-			ui_drawstr(FE_SCR, FE_LAYER, "\\\n/", 21, 7);
-			ui_drawstr(FE_SCR, FE_LAYER, "/\n\\", 10, 7);
+			ui_drawstr(map, 21, 7, "\\\n/");
+			ui_drawstr(map, 10, 7, "/\n\\");
 		} else {
 			next_idx = idx;
 			prev_idx = idx;
 		}
 
-		ui_drawstr_xcenter(FE_SCR, FE_LAYER, (char[]){minf[idx].drv,':','\0'}, 15);
+		ui_drawstr_xcenterf(map, 15, "%c:", minf[idx].drv);
 
-		if (*minf[idx].label) {
-			ui_drawstr_xcenter(FE_SCR, FE_LAYER, minf[idx].label, 16);
-		} else {
-			ui_drawstr_xcenter(FE_SCR, FE_LAYER, "No label", 16);
-		}
+		if (*minf[idx].label) ui_drawstr_xcenter(map, 16, minf[idx].label);
+		else ui_drawstr_xcenter(map, 16, "No label");
 
 		keypress = ui_waitkey(KEY_LEFT | KEY_RIGHT | KEY_A | KEY_B);
 

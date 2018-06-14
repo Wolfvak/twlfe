@@ -6,9 +6,6 @@
 
 #include "font.h"
 
-#define TFB_WIDTH	(32)
-#define TFB_HEIGHT	(24)
-
 static int ui_bg[2][4];
 
 #define UI_MSGSCR	(SUBSCR)
@@ -16,6 +13,21 @@ static int ui_bg[2][4];
 #define UI_MENUSCR	(SUBSCR)
 #define UI_PROGSCR	(SUBSCR)
 
+#define STRBUF_LEN	(256)
+
+#define UI_FORMAT_HELPER(f, s) \
+	va_list va; \
+	char s[STRBUF_LEN]; \
+	va_start(va, (f)); \
+	vsnprintf(s, STRBUF_LEN-1, (f), va);\
+	va_end(va); \
+	s[STRBUF_LEN-1] = '\0';
+
+/*
+ * index zero is always transparent
+ * indexes 1-14 are black
+ * index 15 is white
+ */
 static void _ui_init_palette(vu16 *pal)
 {
 	for (int i = 0; i < 15; i++)
@@ -28,7 +40,6 @@ static void _ui_init_palette(vu16 *pal)
  * char one is always a full opaque block
  * everything else is transcoded from the font
  */
-
 static void _ui_init_font(const unsigned char *font, size_t chars, vu16 *tile)
 {
 	vu32 *tile32 = (vu32*)tile;
@@ -55,16 +66,9 @@ static void _ui_init_font(const unsigned char *font, size_t chars, vu16 *tile)
 	}
 }
 
-static void _ui_tilemap_set(int screen, int bg, int c)
+static void _ui_rect(vu16 *map, int c, size_t x,
+					size_t y, size_t w, size_t h)
 {
-	vu16 *map = bgGetMapPtr(ui_bg[screen][bg]);
-	for (int i = 0; i < TFB_WIDTH*TFB_HEIGHT; i++)
-		map[i] = c;
-}
-
-static void _ui_fill(int screen, int bg, int c, size_t x,
-							size_t y, size_t w, size_t h) {
-	vu16 *map = bgGetMapPtr(ui_bg[screen][bg]) + (y * TFB_WIDTH);
 	w += x;
 	while(h--) {
 		for (size_t _x = x; _x < w; _x++)
@@ -75,7 +79,7 @@ static void _ui_fill(int screen, int bg, int c, size_t x,
 
 static size_t _ui_strdim(const char *str, size_t *width, size_t *height)
 {
-	const char *strs = str;
+	const char *str_s = str;
 	size_t mw = 0, w = 0, h = 0;
 	while(*str) {
 		switch(*str) {
@@ -93,13 +97,9 @@ static size_t _ui_strdim(const char *str, size_t *width, size_t *height)
 	}
 	if (width) *width = (w > mw) ? w : mw;
 	if (height) *height = h;
-	return (str - strs);
+	return (str - str_s);
 }
 
-void ui_tilemap_clr(int screen, int bg)
-{
-	_ui_tilemap_set(screen, bg, CHR_TRANSPARENT);
-}
 
 int ui_waitkey(int keymask) {
 	int pressed;
@@ -118,15 +118,43 @@ int ui_waitkey(int keymask) {
 	}
 }
 
-void ui_drawc(int screen, int bg, int c, size_t x, size_t y) {
-	vu16 *m = bgGetMapPtr(ui_bg[screen][bg]);
-	m[y * TFB_WIDTH + x] = c;
+void ui_reset(void)
+{
+	videoSetMode(MODE_0_2D);
+	videoSetModeSub(MODE_0_2D);
+	vramSetBankA(VRAM_A_MAIN_BG);
+	vramSetBankC(VRAM_C_SUB_BG);
+
+	/* initialize backgrounds */
+	for (int i = 0; i < 4; i++) {
+		ui_bg[MAINSCR][i] = bgInit(i, BgType_Text4bpp, BgSize_T_256x256, i, 4);
+		ui_bg[SUBSCR][i] = bgInitSub(i, BgType_Text4bpp, BgSize_T_256x256, i, 4);
+	}
+
+	/* initialize palettes */
+	_ui_init_palette(BG_PALETTE);
+	_ui_init_palette(BG_PALETTE_SUB);
+
+	/* intitialize font tiles */
+	_ui_init_font(font, 256, bgGetGfxPtr(ui_bg[MAINSCR][0]));
+	_ui_init_font(font, 256, bgGetGfxPtr(ui_bg[SUBSCR][0]));
+
+	/* clear tilemaps, enable bg layer */
+	for (int l = 0; l < 4; l++) {
+		ui_tilemap_clr(ui_map(MAINSCR, l));
+		ui_tilemap_clr(ui_map(MAINSCR, l));
+		videoBgEnable(l);
+		videoBgEnableSub(l);
+	}
 }
 
-
-void ui_drawstr(int screen, int bg, const char *str, size_t x, size_t y)
+vu16 *ui_map(int screen, int bg)
 {
-	vu16 *map = bgGetMapPtr(ui_bg[screen][bg]);
+	return bgGetMapPtr(ui_bg[screen][bg]);
+}
+
+void ui_drawstr(vu16 *map, size_t x, size_t y, const char *str)
+{
 	size_t i = y * TFB_WIDTH + x;
 	while(*str) {
 		switch(*str) {
@@ -143,70 +171,107 @@ void ui_drawstr(int screen, int bg, const char *str, size_t x, size_t y)
 	}
 }
 
-int ui_drawstr_center(int screen, int bg, const char *str)
+void ui_drawstrf(vu16 *map, size_t x, size_t y, const char *fmt, ...)
+{
+	UI_FORMAT_HELPER(fmt, str);
+	ui_drawstr(map, x, y, str);
+}
+
+int ui_drawstr_center(vu16 *map, const char *str)
 {
 	size_t w, h, y;
 
 	_ui_strdim(str, &w, &h);
 	y = (TFB_HEIGHT - h) / 2;
-	ui_drawstr(screen, bg, str, (TFB_WIDTH - w) / 2, y);
+	ui_drawstr(map, (TFB_WIDTH - w) / 2, y, str);
 	return y + h;
 }
 
-void ui_drawstr_xcenter(int screen, int bg, const char *str, size_t y)
+int ui_drawstr_centerf(vu16 *map, const char *fmt, ...)
 {
-	size_t w, x;
+	UI_FORMAT_HELPER(fmt, str);
+	return ui_drawstr_center(map, str);
+}
+
+void ui_drawstr_xcenter(vu16 *map, size_t y, const char *str)
+{
+	size_t w;
 	_ui_strdim(str, &w, NULL);
-	x = (TFB_WIDTH - w) / 2;
-	ui_drawstr(screen, bg, str, x, y);
+	ui_drawstr(map, (TFB_WIDTH - w) / 2, y, str);
 }
 
-void ui_msg(const char *fmt, ...)
+void ui_drawstr_xcenterf(vu16 *map, size_t y, const char *fmt, ...)
 {
-	va_list va;
-	char msg[256];
-	size_t y;
+	UI_FORMAT_HELPER(fmt, str);
+	ui_drawstr_xcenter(map, y, str);
+}
 
-	va_start(va, fmt);
-	vsnprintf(msg, 255, fmt, va);
-	va_end(va);
+void ui_drawstr_ycenter(vu16 *map, size_t x, const char *str)
+{
+	size_t h;
+	_ui_strdim(str, NULL, &h);
+	ui_drawstr(map, x, (TFB_HEIGHT - h) / 2, str);
+}
 
-	msg[255] = '\0';
-	y = ui_drawstr_center(UI_MSGSCR, BG_PROM, msg) + 2;
-	ui_drawstr(UI_MSGSCR, BG_PROM, "Press any button to continue", 3, y);
+void ui_drawstr_ycenterf(vu16 *map, size_t x, const char *fmt, ...)
+{
+	UI_FORMAT_HELPER(fmt, str);
+	ui_drawstr_ycenter(map, x, str);
+}
+
+void ui_msg(const char *str)
+{
+	vu16 *map = ui_map(UI_MSGSCR, BG_PROM);
+	size_t y = ui_drawstr_center(map, str);
+
+	ui_drawstr_xcenter(map, y + 2, "Press any button to continue");
 	ui_waitkey(KEY_BUTTON);
-
-	ui_tilemap_clr(UI_MSGSCR, BG_PROM);
+	ui_tilemap_clr(map);
 }
 
-bool ui_ask(const char *msg)
+void ui_msgf(const char *fmt, ...)
 {
-	int key;
-	size_t y;
+	UI_FORMAT_HELPER(fmt, str);
+	ui_msg(str);
+}
 
-	_ui_tilemap_set(UI_ASKSCR, BG_PROM, CHR_OPAQUE);
-	y = ui_drawstr_center(UI_ASKSCR, BG_PROM, msg);
-	ui_drawstr(UI_ASKSCR, BG_PROM, "(A) Yes / (B) No", 8, y + 2);
+bool ui_ask(const char *str)
+{
+	vu16 *map = ui_map(UI_ASKSCR, BG_PROM);
+	size_t y;
+	int key;
+
+	ui_tilemap_set(map, CHR_OPAQUE);
+	y = ui_drawstr_center(map, str);
+	ui_drawstr_xcenter(map, y + 2, "(A) Yes / (B) No");
 	key = ui_waitkey(KEY_A | KEY_B);
-	ui_tilemap_clr(UI_ASKSCR, BG_PROM);
+	ui_tilemap_clr(map);
 	return (key & KEY_A) != 0;
 }
 
-/* shamelessly ""inspired"" by gm9 */
-int ui_menu(int nopt, const char **opt, const char *msg)
+bool ui_askf(const char *fmt, ...)
 {
-	int opt_y, opt_x, winsz, wins, wine, ret;
-	size_t msg_w, msg_h, msg_x, maxsw;
+	UI_FORMAT_HELPER(fmt, str);
+	return ui_ask(str);
+}
+
+/* shamelessly ""inspired"" by gm9 */
+int ui_menu(int nopt, const char **opt, const char *str)
+{
+	vu16 *map;
 	bool redraw;
+	size_t str_w, str_h, maxsw;
+	int opt_y, opt_x, winsz, wins, wine, ret;
 
 	sassert(nopt > 0, "no options provided");
 
-	_ui_fill(UI_MENUSCR, BG_PROM, CHR_OPAQUE, 0, 0, TFB_WIDTH, TFB_HEIGHT);
-	_ui_strdim(msg, &msg_w, &msg_h);
-	msg_x = (TFB_WIDTH - msg_w) / 2;
-	opt_y = msg_h + 3;
+	_ui_strdim(str, &str_w, &str_h);
+	opt_y = str_h + 3;
 
-	ui_drawstr(UI_MENUSCR, BG_PROM, msg, msg_x, 1);
+	map = ui_map(UI_MENUSCR, BG_PROM);
+
+	ui_tilemap_set(map, CHR_OPAQUE);
+	ui_drawstr_xcenter(map, 1, str);
 
 	maxsw = 0;
 	for (int i = 0; i < nopt; i++) {
@@ -227,18 +292,18 @@ int ui_menu(int nopt, const char **opt, const char *msg)
 
 		if (redraw) {
 			swiWaitForVBlank();
-			_ui_fill(UI_MENUSCR, BG_PROM, CHR_OPAQUE, opt_x + 2, opt_y, maxsw, winsz);
+			_ui_rect(map, CHR_OPAQUE, opt_x + 2, opt_y, maxsw, winsz);
 			for (int i = 0; i < winsz; i++) {
 				int opti = wins + i;
 				if (opti >= nopt) break;
-				ui_drawstr(UI_MENUSCR, BG_PROM, opt[opti], opt_x + 2, opt_y + i);
+				ui_drawstr(map, opt_x + 2, opt_y + i, opt[opti]);
 			}
 			redraw = false;
 		}
 
 		for (int i = 0; i < winsz; i++) {
 			int opti = wins + i;
-			ui_drawc(UI_MENUSCR, BG_PROM, (ret==opti)?'>':' ', opt_x, opt_y + i);
+			ui_drawc(map, (ret==opti)?'>':' ', opt_x, opt_y + i);
 		}
 
 		pressed = ui_waitkey(KEY_UP | KEY_DOWN | KEY_LEFT | KEY_RIGHT | KEY_A | KEY_B);
@@ -254,13 +319,13 @@ int ui_menu(int nopt, const char **opt, const char *msg)
 		}
 
 		if (pressed & KEY_A) break;
-		if (pressed & KEY_B) {
+		else if (pressed & KEY_B) {
 			ret = -1;
 			break;
 		}
 
 		if (ret < 0) ret = nopt-1;
-		if (ret >= nopt) ret = 0;
+		else if (ret >= nopt) ret = 0;
 
 		if (ret >= wine) {
 			wins = wine;
@@ -276,91 +341,54 @@ int ui_menu(int nopt, const char **opt, const char *msg)
 			redraw = true;
 		}
 	}
-	ui_tilemap_clr(UI_MENUSCR, BG_PROM);
+	ui_tilemap_clr(map);
 	return ret;
 }
 
-void ui_progress(uint64_t cur, uint64_t tot, const char *un, const char *msg)
+int ui_menuf(int nopt, const char **opt, const char *fmt, ...)
 {
-	char prog[32];
-	int per, barc;
-	size_t w, h, x, y;
+	UI_FORMAT_HELPER(fmt, str);
+	return ui_menu(nopt, opt, str);
+}
+
+void ui_progress(uint64_t cur, uint64_t tot, const char *un, const char *str)
+{
+	vu16 *map;
+	int per, barc, y;
+
+	map = ui_map(UI_PROGSCR, BG_INFO);
 
 	if (cur > tot) {
-		ui_tilemap_clr(UI_PROGSCR, BG_INFO);
+		ui_tilemap_clr(map);
 		return;
 	}
+
+	if (un == NULL) un = "";
 
 	per = ((cur * 100) / tot);
 	barc = (per * TFB_WIDTH) / 100;
 
-	_ui_strdim(msg, &w, &h);
-
-	x = (TFB_WIDTH - w) / 2;
-	y = ((TFB_HEIGHT - h) / 2) - 3;
-
 	swiWaitForVBlank();
-	_ui_fill(UI_PROGSCR, BG_INFO, CHR_OPAQUE, 0, y, TFB_WIDTH, 3);
+	ui_tilemap_set(map, CHR_OPAQUE);
 
-	ui_drawstr(UI_PROGSCR, BG_INFO, msg, x, y);
+	y = (TFB_WIDTH / 2) - 3;
+	ui_drawstr_xcenter(map, y, str);
 
-	_ui_fill(UI_PROGSCR, BG_INFO, CHR_SEPTOP, 0, y + 1, TFB_WIDTH, 1);
-	_ui_fill(UI_PROGSCR, BG_INFO, CHR_SEPBOT, 0, y + 3, TFB_WIDTH, 1);
+	_ui_rect(map, CHR_SEPTOP, 0, y + 1, TFB_WIDTH, 1);
+	_ui_rect(map, CHR_SEPBOT, 0, y + 3, TFB_WIDTH, 1);
 
-	if (barc >= 0) {
-		ui_drawc(UI_PROGSCR, BG_INFO, CHR_PBARS, 0, y + 2);
-		_ui_fill(UI_PROGSCR, BG_INFO, CHR_PBARM, 1, y + 2, barc - 1, 1);
-		if (barc == TFB_WIDTH)
-			ui_drawc(UI_PROGSCR, BG_INFO, CHR_PBARE, TFB_WIDTH - 1, y + 2);
+	static const char ui_prog_char[] = {CHR_PBARS, CHR_PBARM, CHR_PBARE};
+	for (size_t i = 0; i < barc; i++) {
+		size_t idx = (i == 0) ? 0 : ((i == 32) ? 2 : 1);
+		ui_drawc(map, ui_prog_char[idx], i, y + 2);
 	}
-	_ui_fill(UI_PROGSCR, BG_INFO, CHR_OPAQUE, barc, y + 2, TFB_WIDTH - barc, 1);
 
-	if (un == NULL) un = "";
-
-	prog[31] = '\0';
-	w = snprintf(prog, 31, "%llu/%llu %s (%d%%)", cur, tot, un, per);
-	ui_drawstr(UI_PROGSCR, BG_INFO, prog, (TFB_WIDTH - w) / 2, y + 3);
+	_ui_rect(map, CHR_OPAQUE, barc, y + 2, TFB_WIDTH - barc, 1);
+	ui_drawstr_xcenterf(map, y + 3, "%llu/%llu %s (%d%%)", cur, tot, un, per);
 }
 
-void ui_reset(void)
+void ui_progressf(uint64_t cur, uint64_t tot, const char *un, const char *fmt, ...)
 {
-	u16 *font_tiles;
-
-	videoSetMode(MODE_0_2D);
-	videoSetModeSub(MODE_0_2D);
-
-	vramSetBankA(VRAM_A_MAIN_BG);
-	vramSetBankC(VRAM_C_SUB_BG);
-
-	/* initialize backgrounds */
-	for (int i = 0; i < 4; i++) {
-		ui_bg[MAINSCR][i] = bgInit(i, BgType_Text4bpp, BgSize_T_256x256, i, 4);
-		ui_bg[SUBSCR][i] = bgInitSub(i, BgType_Text4bpp, BgSize_T_256x256, i, 4);
-	}
-
-	/* initialize palettes */
-	_ui_init_palette(BG_PALETTE);
-	_ui_init_palette(BG_PALETTE_SUB);
-
-	/* intitialize font tiles */
-	font_tiles = malloc(256 * 32);
-	sassert(font_tiles, "this is fine");
-
-	_ui_init_font(font, 256, font_tiles);
-	dmaCopy(font_tiles, bgGetGfxPtr(ui_bg[MAINSCR][0]), 256 * 32);
-	dmaCopy(font_tiles, bgGetGfxPtr(ui_bg[SUBSCR][0]), 256 * 32);
-
-	free(font_tiles);
-
-	/* clear tilemaps */
-	for (int l = 0; l < 4; l++) {
-		ui_tilemap_clr(MAINSCR, l);
-		ui_tilemap_clr(SUBSCR, l);
-	}
-
-	/* enable and show all background layers */
-	for (int i = 0; i < 4; i++) {		
-		videoBgEnable(i);		
-		videoBgEnableSub(i);
-	}
+	UI_FORMAT_HELPER(fmt, str);
+	ui_progress(cur, tot, un, str);
 }
