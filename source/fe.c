@@ -28,9 +28,10 @@ static inline off_t get_mount_size(char drv) {
 
 static inline const char *get_mount_label(char drv) {
 	vfs_ioctl_t io;
-	if (!IS_ERR(vfs_ioctl(drv, VFS_IOCTL_LABEL, &io)))
+	if (!IS_ERR(vfs_ioctl(drv, VFS_IOCTL_LABEL, &io)) &&
+		io.strval == NULL && *io.strval != '\0')
 		return io.strval;
-	return NULL;
+	return "(No label)";
 }
 
 static inline const char *get_mount_icon(char drv) {
@@ -65,13 +66,13 @@ void fe_draw_icon(const char *icon, size_t x, size_t y)
 	}
 }
 
-char *fe_mount_menu(char *return_path)
+void fe_main(char drv);
+
+void fe_mount_menu(void)
 {
 	vu16 *map = ui_map(0, 0);
 	fe_mount_info minf[VFS_MOUNTPOINTS];
 	int mcnt = get_mount_info(minf, VFS_MOUNTPOINTS), idx = 0;
-
-	ui_msgf("%d", mcnt);
 
 	while(true) {
 		int keypress;
@@ -98,26 +99,24 @@ char *fe_mount_menu(char *return_path)
 		}
 
 		ui_drawstr_xcenterf(map, 15, "%c:", minf[idx].drv);
-
-		if (*minf[idx].label)
-			ui_drawstr_xcenter(map, 16, minf[idx].label);
-		else
-			ui_drawstr_xcenter(map, 16, "No label");
+		ui_drawstr_xcenter(map, 16, minf[idx].label);
 
 		strcpy(sizestr, "Size: ");
 		size_format(&sizestr[6], minf[idx].size);
-
 		ui_drawstr_xcenter(map, 17, sizestr);
 
 		keypress = ui_waitkey(KEY_LEFT | KEY_RIGHT | KEY_A | KEY_B);
 
 		if (keypress & KEY_LEFT) idx--;
 		else if (keypress & KEY_RIGHT) idx++;
-		//else if (keypress & KEY_A) return fe_main(minf[idx].drv);
-		else if (keypress & KEY_B) return NULL;
+		else if (keypress & KEY_A) {
+			fe_main(minf[idx].drv);
+			break;
+		} else if (keypress & KEY_B) {
+			break;
+		}
 
 		if (idx < 0) idx = mcnt-1;
 		if (idx > mcnt-1) idx = 0;
 	}
-	return return_path;
 }

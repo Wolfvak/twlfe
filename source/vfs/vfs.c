@@ -422,8 +422,10 @@ int vfs_dirclose(int dd)
 
 	/* ditto, with dirclose */
 	res = ops->dirclose(mnt, dir);
-	if (!IS_ERR(res))
+	if (!IS_ERR(res)) {
+		_vfs_close_vfd(dd);
 		(mnt->acts)--;
+	}
 
 	return res;
 }

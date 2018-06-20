@@ -134,27 +134,34 @@ static const char *format_suf[] = {
 	"B", "KiB", "MiB", "GiB", "TiB", "PiB", "EiB"
 };
 
+static inline size_t ctz64(uint64_t n) {
+	size_t lower = n, upper = n >> 32;
+	if (n == 0) return 0;
+	switch(upper) {
+		case 0:  return 31 - __builtin_clz(lower);
+		default: return 63 - __builtin_clz(upper);
+	}
+}
+
 size_t size_format(char *out, off_t size)
 {
-	size_t size_log2, scale, intpart, decpart;
+	size_t sz_scale, intp, decp;
 
 	if (size < 0) {
 		strcpy(out, "negative?");
 		return 0;
+	} else if (size < 1024) {
+		return sprintf(out, "%d B", (size_t)size);
 	}
 
-	if (size == 0) {
-		size_log2 = 0;
-	} else if ((size_t)(size >> 32) == 0) {
-		size_log2 = (31 - __builtin_clz((size_t)size));
-	} else {
-		size_log2 = (63 - __builtin_clz((size_t)(size >> 32)));
-	}
+	sz_scale = ctz64(size);
+	sz_scale = (sz_scale / 10) * 10;
 
-	scale = (size_log2 / 10) * 10;
+	intp = size >> sz_scale;
 
-	intpart = size >> scale;
-	decpart = ((size - (intpart << scale)) % 1000) / 100;
+	decp = size - (intp << sz_scale);
+	decp >>= sz_scale - 10;
+	decp /= 100;
 
-	return sprintf(out, "%d.%d %s", intpart, decpart, format_suf[scale / 10]);
+	return sprintf(out, "%d.%d %s", intp, decp, format_suf[sz_scale / 10]);
 }

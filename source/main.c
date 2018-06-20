@@ -10,7 +10,7 @@
 int dldi_mount(char drive);
 int memfs_init(char drv);
 
-char *fe_mount_menu(char*);
+void fe_mount_menu(void);
 
 int main(void) {
 	defaultExceptionHandler();
@@ -19,5 +19,5 @@ int main(void) {
 	memfs_init('A');
 	dldi_mount('B');
 
-	while(1) fe_mount_menu(NULL);
+	while(1) fe_mount_menu();
 }
