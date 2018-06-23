@@ -114,7 +114,6 @@ int open_compound_path(int mode, const char *fmt, ...)
 	vsnprintf(path, MAX_PATH, fmt, va);
 	va_end(va);
 
-	path[MAX_PATH] = '\0';
 	return vfs_open(path, mode);
 }
 
@@ -146,10 +145,10 @@ size_t size_format(char *out, off_t size)
 	mtude = (ctz64(size) / 10) * 10;
 
 	intp = size >> mtude;
-	decp = ((size - (intp << mtude)) >> (mtude - 10)) % 1000;
-	if (decp >= 100) {
-		decp /= 10;
-	}
+	decp = (size - ((size >> mtude) << mtude)) >> (mtude-10);
+	decp *= 1000;
+	decp /= 1024;
+	if (decp >= 100) decp /= 10;
 
 	return sprintf(out, "%d.%d %ciB", intp, decp, format_suf[mtude/10]);
 }

@@ -21,7 +21,6 @@ static int ui_bg[2][4];
 	va_start(va, (f)); \
 	vsnprintf(s, STRBUF_LEN-1, (f), va);\
 	va_end(va); \
-	s[STRBUF_LEN-1] = '\0';
 
 /*
  * index zero is always transparent
@@ -108,13 +107,14 @@ static void ui_drawmwidthstr(vu16 *map, u8 *x, size_t y, const char *str)
 	size_t line = 0, i = y * TFB_WIDTH + x[0];
 	while(*str) {
 		switch(*str) {
+			default:
+				map[i++] = *str;
+				break;
+
 			case '\n':
 				i -= i % TFB_WIDTH;
 				i += TFB_WIDTH + x[++line];
 				break;
-
-			default:
-				map[i++] = *str;
 		}
 		str++;
 	}
@@ -161,7 +161,7 @@ void ui_reset(void)
 	/* clear tilemaps, enable bg layer */
 	for (int l = 0; l < 4; l++) {
 		ui_tilemap_clr(ui_map(MAINSCR, l));
-		ui_tilemap_clr(ui_map(MAINSCR, l));
+		ui_tilemap_clr(ui_map(SUBSCR, l));
 		videoBgEnable(l);
 		videoBgEnableSub(l);
 	}
