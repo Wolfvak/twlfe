@@ -5,7 +5,7 @@
 
 #include "err.h"
 
-#define PSTOR_CACHE_DIV	(64)
+#define PSTOR_CACHE_DIV	(32)
 /*
  * need to loop ^ times in a worst case
  * scenario to get an arbitrary path
@@ -42,13 +42,17 @@ int pstor_cat(pstor_t *ps, const char *str);
 /* move on to the next path */
 int pstor_finish(pstor_t *ps);
 
-/* copy the (`i`-1)-th path to `out` */
+/* copy the `i`-th path to `out` */
 int pstor_getpath(pstor_t *ps, char *out, size_t max, size_t i);
 
 /* get the current amount of paths in the store */
-size_t pstor_count(pstor_t *ps);
+static inline size_t pstor_count(pstor_t *ps) {
+	return ps->count;
+}
 
 /* get the number of available slots in the store */
-size_t pstor_max(pstor_t *ps);
+static inline size_t pstor_max(pstor_t *ps) {
+	return ps->max;
+}
 
 #endif /* PSTOR_H__ */

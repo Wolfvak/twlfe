@@ -7,10 +7,13 @@
 #include "ui.h"
 #include "vfs.h"
 
+#include "global.h"
+
+#include "bp.h"
 #include "pstor.h"
 #include "vfs_glue.h"
 
-#define FE_PATHBUF	(SIZE_KIB(128))
+#define FE_PATHBUF	(SIZE_KIB(2048))
 #define FE_MAXITEM	(16384)
 
 static int scan_dir(pstor_t *ps, const char *dir)
@@ -66,7 +69,7 @@ static inline bool path_is_dir(char *p, size_t l) {
 
 #define FE_PSTORM_Y		(2)
 #define FE_PSTORM_YSZ	(TFB_HEIGHT - 2)
-static int fe_pstormenu(vu16 *map, pstor_t *ps)
+static int fe_filemenu(vu16 *map, pstor_t *ps, bp_t *clipboard)
 {
 	int res, sel = 0, base = 0, count = pstor_count(ps);
 	bool redraw_menu = true;
@@ -75,21 +78,22 @@ static int fe_pstormenu(vu16 *map, pstor_t *ps)
 		return -1;
 	}
 
+	bp_clearall(clipboard);
+
 	while(1) {
 		int pressed, end;
 
 		end = base + FE_PSTORM_YSZ;
 		if (end > count) end = count;
 
-		if (redraw_menu) {
-			char drawpath[MAX_PATH + 1];
-
+		if (UNLIKELY(redraw_menu)) {
 			redraw_menu = false;
 
 			swiWaitForVBlank();
 			ui_tilemap_clr(map);
 
 			for (int i = base; i < end; i++) {
+				char drawpath[MAX_PATH + 1];
 				res = pstor_getpath(ps, drawpath, MAX_PATH, i);
 				if (IS_ERR(res)) {
 					ui_msgf("Failed to get path:\n%s", err_getstr(res));
@@ -99,10 +103,21 @@ static int fe_pstormenu(vu16 *map, pstor_t *ps)
 			}
 		}
 
-		for (int i = base; i < end; i++)
+		for (int i = base; i < end; i++) {
 			ui_drawc(map, (i == sel) ? '>' : ' ', 0, i - base + FE_PSTORM_Y);
+			ui_drawc(map, bp_tst(clipboard, i) ? '^' : ' ', 1, i - base + FE_PSTORM_Y);
+		}
 
-		pressed = ui_waitkey(KEY_UP|KEY_DOWN|KEY_LEFT|KEY_RIGHT|KEY_A|KEY_B);
+		pressed = ui_waitkey(KEY_UP|KEY_DOWN|KEY_LEFT|KEY_RIGHT|KEY_A|KEY_B|KEY_R);
+
+		if (pressed & KEY_A) {
+			break;
+		} else if (pressed & KEY_B) {
+			sel = -1;
+			break;
+		} else if ((pressed & KEY_R) && (sel > 0)) {
+			bp_xor(clipboard, sel);
+		}
 
 		if (pressed & KEY_UP) {
 			sel--;
@@ -112,13 +127,6 @@ static int fe_pstormenu(vu16 *map, pstor_t *ps)
 			sel -= FE_PSTORM_YSZ;
 		} else if (pressed & KEY_RIGHT) {
 			sel += FE_PSTORM_YSZ;
-		}
-
-		if (pressed & KEY_A) {
-			break;
-		} else if (pressed & KEY_B) {
-			sel = -1;
-			break;
 		}
 
 		if (sel < 0) sel = 0;
@@ -142,34 +150,32 @@ static int fe_pstormenu(vu16 *map, pstor_t *ps)
 	return sel;
 }
 
-void fe_main(char drv, vu16 *map)
+void fe_main(char drv, pstor_t *paths, bp_t *clipboard, vu16 *map)
 {	
 	char cwd[MAX_PATH + 1];
 	int res, sel;
-	pstor_t ps;
 
-	sprintf(cwd, "%c:/", drv);
-
-	res = pstor_init(&ps, FE_PATHBUF, FE_MAXITEM);
-	if (IS_ERR(res)) {
-		ui_msgf("Failed to allocate path store:\n%s", err_getstr(res));
+	if (pstor_max(paths) != bp_maxcnt(clipboard)) {
+		ui_msg("someone seriously needs to\npunch Wolfvak right now");
 		return;
 	}
 
+	sprintf(cwd, "%c:/", drv);
+
 	while(1) {
-		res = scan_dir(&ps, cwd);
+		res = scan_dir(paths, cwd);
 		if (IS_ERR(res)) {
 			ui_msgf("Failed to scan dir\n\"%s\"\n%s", cwd, err_getstr(res));
 			break;
 		}
 
-		sel = fe_pstormenu(map, &ps);
+		sel = fe_filemenu(map, paths, clipboard);
 		if (sel <= 0) {
-			if (path_is_topdir(cwd)) return;
+			if (path_is_topdir(cwd)) break;
 			path_basedir(cwd);
 		} else {
 			char fpath[MAX_PATH + 1];
-			int len = pstor_getpath(&ps, fpath, MAX_PATH, sel);
+			int len = pstor_getpath(paths, fpath, MAX_PATH, sel);
 			if (path_is_dir(fpath, len)) {
 				strcat(cwd, fpath);
 			} else {

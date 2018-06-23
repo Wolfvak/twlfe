@@ -88,13 +88,3 @@ int pstor_getpath(pstor_t *ps, char *out, size_t max, size_t i)
 	out[plen] = '\0';
 	return plen;
 }
-
-size_t pstor_count(pstor_t *ps)
-{
-	return ps->count;
-}
-
-size_t pstor_max(pstor_t *ps)
-{
-	return ps->max;
-}

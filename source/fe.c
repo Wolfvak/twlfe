@@ -7,6 +7,8 @@
 #include "ui.h"
 #include "vfs.h"
 
+#include "bp.h"
+#include "pstor.h"
 #include "vfs_glue.h"
 
 #define FE_SCR		(MAINSCR)
@@ -19,7 +21,7 @@ typedef struct {
 	off_t size;
 } fe_mount_info;
 
-void fe_main(char drv, vu16 *map);
+void fe_main(char drv, pstor_t *paths, bp_t *clipboard, vu16 *map);
 
 static inline off_t get_mount_size(char drv) {
 	vfs_ioctl_t io;
@@ -67,11 +69,29 @@ static inline void fe_draw_icon(vu16 *map, const char *icon, size_t x, size_t y)
 	}
 }
 
+#define FE_PATHBUF	(SIZE_KIB(2048))
+#define FE_MAXITEM	(16384)
+
 void fe_mount_menu(void)
 {
 	vu16 *map = ui_map(MAINSCR, BG_MAIN);
 	fe_mount_info minf[VFS_MOUNTPOINTS];
-	int mcnt = get_mount_info(minf, VFS_MOUNTPOINTS), idx = 0;
+	int mcnt = get_mount_info(minf, VFS_MOUNTPOINTS), idx = 0, res;
+
+	pstor_t ps;
+	bp_t clipboard;
+
+	res = pstor_init(&ps, FE_PATHBUF, FE_MAXITEM);
+	if (IS_ERR(res)) {
+		ui_msgf("Failed pathstore init:\n%s", err_getstr(res));
+		return;
+	}
+
+	res = bp_init(&clipboard, FE_MAXITEM);
+	if (IS_ERR(res)) {
+		ui_msgf("Failed clipboard init:\n%s", err_getstr(res));
+		return;
+	}
 
 	while(1) {
 		int keypress;
@@ -101,15 +121,12 @@ void fe_mount_menu(void)
 		ui_drawstr_xcenterf(map, 15, "%c:\n%s", minf[idx].drv, minf[idx].label);
 		ui_drawstr_xcenterf(map, 17, "Size: %s", szstr);
 
-		keypress = ui_waitkey(KEY_LEFT | KEY_RIGHT | KEY_A | KEY_B);
+		keypress = ui_waitkey(KEY_LEFT | KEY_RIGHT | KEY_A);
 
 		if (keypress & KEY_LEFT) idx--;
 		else if (keypress & KEY_RIGHT) idx++;
 		else if (keypress & KEY_A) {
-			fe_main(minf[idx].drv, map);
-			break;
-		} else if (keypress & KEY_B) {
-			break;
+			fe_main(minf[idx].drv, &ps, &clipboard, map);
 		}
 
 		if (idx < 0) idx = mcnt-1;
