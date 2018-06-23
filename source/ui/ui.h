@@ -4,6 +4,8 @@
 #include <nds.h>
 #include <stdarg.h>
 
+#include "global.h"
+
 #define KEY_FACE	(KEY_A | KEY_B | KEY_X | KEY_Y)
 #define KEY_DPAD	(KEY_UP | KEY_DOWN | KEY_LEFT | KEY_RIGHT)
 #define KEY_OTHR	(KEY_SELECT | KEY_START | KEY_L | KEY_R)
@@ -30,6 +32,27 @@ enum {
 	BG_ERR	= 0
 };
 
+enum {
+	COL_WHITE	= 0,
+	COL_BLACK	= 1,
+	COL_RED		= 2,
+	COL_GREEN	= 3,
+	COL_BLUE	= 4,
+	COL_YELLOW	= 5,
+	COL_MAGENTA	= 6,
+};
+
+#define UISTR_WHITE	"\xFF"
+#define UISTR_BLACK	"\xFE"
+#define UISTR_RED		"\xFD"
+#define UISTR_GREEN	"\xFC"
+#define UISTR_BLUE		"\xFB"
+#define UISTR_YELLOW	"\xFA"
+#define UISTR_MAGENTA	"\xF9"
+
+#define CCHR_MAX	(255)
+#define CCHR_MIN	(CCHR_MAX - COL_MAGENTA)
+
 /*
  * waits for one of the keys in `keymask` to be pressed
  * includes key debounce in case the key is already held down
@@ -42,9 +65,23 @@ void ui_reset(void);
 /* get the charmap for the selected screen and background layer */
 vu16 *ui_map(int screen, int bg);
 
+static inline int cchr_is_pal(int c)
+{
+	return (c >= CCHR_MIN && c <= CCHR_MAX);
+}
+
+/* transforms a color indicator char into the palette offset bit thing */
+static inline u16 cchr_to_pal(int c)
+{
+	return TILE_PALETTE(CCHR_MAX - c);
+}
+
 /* fills the map with `c` */
 static inline void ui_tilemap_set(vu16 *map, int c) {
 	size_t mapsz = TFB_WIDTH * TFB_HEIGHT;
+	if (UNLIKELY(cchr_is_pal(c))) {
+		c = cchr_to_pal(c) | CHR_OPAQUE;
+	}
 	while(mapsz--) *(map++) = c;
 }
 
@@ -58,6 +95,9 @@ static inline void ui_tilemap_clr(vu16 *map) {
 
 /* draw a single character to the map at the specified coordinates */
 static inline void ui_drawc(vu16 *map, int c, size_t x, size_t y) {
+	if (UNLIKELY(cchr_is_pal(c))) {
+		c = cchr_to_pal(c) | CHR_OPAQUE;
+	}
 	map[y * TFB_WIDTH + x] = c;
 }
 

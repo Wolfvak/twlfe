@@ -29,9 +29,18 @@ static int ui_bg[2][4];
  */
 static void _ui_init_palette(vu16 *pal)
 {
-	for (int i = 0; i < 15; i++)
-		pal[i] = 0;
-	pal[15] = RGB15(0x1F, 0x1F, 0x1F);
+	/* 16 palettes, each with 16 RGB555 colors */
+	for (int i = 0; i < 16*16/2; i++) {
+		((vu32*)pal)[i] = 0;
+	}
+
+	pal[COL_WHITE*16 + 15]		= RGB15(0x1F, 0x1F, 0x1F);
+	pal[COL_BLACK*16 + 15]		= RGB15(0x00, 0x00, 0x00);
+	pal[COL_RED*16 + 15]		= RGB15(0x1F, 0x00, 0x00);
+	pal[COL_GREEN*16 + 15]		= RGB15(0x00, 0x1F, 0x00);
+	pal[COL_BLUE*16 + 15]		= RGB15(0x00, 0x00, 0x1F);
+	pal[COL_YELLOW*16 + 15]		= RGB15(0x1F, 0x1F, 0x00);
+	pal[COL_MAGENTA*16 + 15]	= RGB15(0x1F, 0x00, 0x1F);
 }
 
 /*
@@ -70,6 +79,11 @@ static void _ui_rect(vu16 *map, int c, size_t x,
 {
 	map += y * TFB_WIDTH;
 	w += x;
+
+	if (UNLIKELY(cchr_is_pal(c))) {
+		c = cchr_to_pal(c) | CHR_OPAQUE;
+	}
+
 	while(h--) {
 		for (size_t _x = x; _x < w; _x++)
 			map[_x] = c;
@@ -83,15 +97,12 @@ static size_t _ui_strdim(const char *str, u8 *width, size_t *height)
 	size_t w = 0, line = 0;
 
 	while(*str) {
-		switch(*str) {
-			default:
-				w++;
-				break;
-
-			case '\n':
-				if (width) width[line++] = w;
-				w = 0;
-				break;
+		char c = *str;
+		if (UNLIKELY(c == '\n')) {
+			if (width) width[line++] = w;
+			w = 0;
+		} else if (LIKELY(!cchr_is_pal(c))) {
+			w++;
 		}
 		str++;
 	}
@@ -105,17 +116,19 @@ static size_t _ui_strdim(const char *str, u8 *width, size_t *height)
 static void ui_drawmwidthstr(vu16 *map, u8 *x, size_t y, const char *str)
 {
 	size_t line = 0, i = y * TFB_WIDTH + x[0];
-	while(*str) {
-		switch(*str) {
-			default:
-				map[i++] = *str;
-				break;
+	u16 color = 0;
 
-			case '\n':
-				i -= i % TFB_WIDTH;
-				i += TFB_WIDTH + x[++line];
-				break;
+	while(*str) {
+		char c = *str;
+		if (UNLIKELY(c == '\n')) {
+			i -= i % TFB_WIDTH;
+			i += TFB_WIDTH + x[++line];
+		} else if (UNLIKELY(cchr_is_pal(c))) {
+			color = cchr_to_pal(c);
+		} else {
+			map[i++] = (u16)c | color;
 		}
+
 		str++;
 	}
 }
@@ -175,17 +188,19 @@ vu16 *ui_map(int screen, int bg)
 void ui_drawstr(vu16 *map, size_t x, size_t y, const char *str)
 {
 	size_t i = y * TFB_WIDTH + x;
-	while(*str) {
-		switch(*str) {
-			case '\n':
-				i -= i % TFB_WIDTH;
-				i += TFB_WIDTH + x;
-				break;
+	u16 color = 0;
 
-			default:
-				map[i++] = *str;
-				break;
+	while(*str) {
+		char c = *str;
+		if (UNLIKELY(c == '\n')) {
+			i -= i % TFB_WIDTH;
+			i += TFB_WIDTH + x;
+		} else if (UNLIKELY(cchr_is_pal(c))) {
+			color = cchr_to_pal(c);
+		} else {
+			map[i++] = (u16)c | color;
 		}
+
 		str++;
 	}
 }
