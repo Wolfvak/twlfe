@@ -13,7 +13,7 @@ static int ui_bg[2][4];
 #define UI_MENUSCR	(SUBSCR)
 #define UI_PROGSCR	(SUBSCR)
 
-#define STRBUF_LEN	(128)
+#define STRBUF_LEN	(64)
 
 #define UI_FORMAT_HELPER(f, s) \
 	va_list va; \
@@ -69,6 +69,7 @@ static void _ui_init_font(const unsigned char *font, size_t chars, vu16 *tile)
 static void _ui_rect(vu16 *map, int c, size_t x,
 					size_t y, size_t w, size_t h)
 {
+	map += y * TFB_WIDTH;
 	w += x;
 	while(h--) {
 		for (size_t _x = x; _x < w; _x++)
@@ -77,29 +78,47 @@ static void _ui_rect(vu16 *map, int c, size_t x,
 	}
 }
 
-static size_t _ui_strdim(const char *str, size_t *width, size_t *height)
+static size_t _ui_strdim(const char *str, u8 *width, size_t *height)
 {
 	const char *str_s = str;
-	size_t mw = 0, w = 0, h = 0;
+	size_t w = 0, line = 0;
+
 	while(*str) {
 		switch(*str) {
-			case '\n':
-				mw = (w > mw) ? w : mw;
-				w = 0;
-				h++;
-				break;
-
 			default:
 				w++;
+				break;
+
+			case '\n':
+				if (width) width[line++] = w;
+				w = 0;
 				break;
 		}
 		str++;
 	}
-	if (width) *width = (w > mw) ? w : mw;
-	if (height) *height = h;
+
+	if (width) width[line] = w;
+	if (height) *height = line;
+
 	return (str - str_s);
 }
 
+static void ui_drawmwidthstr(vu16 *map, u8 *x, size_t y, const char *str)
+{
+	size_t line = 0, i = y * TFB_WIDTH + x[0];
+	while(*str) {
+		switch(*str) {
+			case '\n':
+				i -= i % TFB_WIDTH;
+				i += TFB_WIDTH + x[++line];
+				break;
+
+			default:
+				map[i++] = *str;
+		}
+		str++;
+	}
+}
 
 int ui_waitkey(int keymask) {
 	int pressed;
@@ -179,11 +198,16 @@ void ui_drawstrf(vu16 *map, size_t x, size_t y, const char *fmt, ...)
 
 int ui_drawstr_center(vu16 *map, const char *str)
 {
-	size_t w, h, y;
+	size_t h, y;
+	u8 w[TFB_HEIGHT];
 
-	_ui_strdim(str, &w, &h);
+	_ui_strdim(str, w, &h);
 	y = (TFB_HEIGHT - h) / 2;
-	ui_drawstr(map, (TFB_WIDTH - w) / 2, y, str);
+
+	for (int i = 0; i <= h; i++)
+		w[i] = (TFB_WIDTH - w[i]) / 2;
+
+	ui_drawmwidthstr(map, w, y, str);
 	return y + h;
 }
 
@@ -193,30 +217,43 @@ int ui_drawstr_centerf(vu16 *map, const char *fmt, ...)
 	return ui_drawstr_center(map, str);
 }
 
-void ui_drawstr_xcenter(vu16 *map, size_t y, const char *str)
-{
-	size_t w;
-	_ui_strdim(str, &w, NULL);
-	ui_drawstr(map, (TFB_WIDTH - w) / 2, y, str);
-}
-
-void ui_drawstr_xcenterf(vu16 *map, size_t y, const char *fmt, ...)
-{
-	UI_FORMAT_HELPER(fmt, str);
-	ui_drawstr_xcenter(map, y, str);
-}
-
-void ui_drawstr_ycenter(vu16 *map, size_t x, const char *str)
+int ui_drawstr_xcenter(vu16 *map, size_t y, const char *str)
 {
 	size_t h;
-	_ui_strdim(str, NULL, &h);
-	ui_drawstr(map, x, (TFB_HEIGHT - h) / 2, str);
+	u8 w[TFB_HEIGHT];
+	_ui_strdim(str, w, &h);
+
+	for (int i = 0; i <= h; i++)
+		w[i] = (TFB_WIDTH - w[i]) / 2;
+
+	ui_drawmwidthstr(map, w, y, str);
+	return y + h;
 }
 
-void ui_drawstr_ycenterf(vu16 *map, size_t x, const char *fmt, ...)
+int ui_drawstr_xcenterf(vu16 *map, size_t y, const char *fmt, ...)
 {
 	UI_FORMAT_HELPER(fmt, str);
-	ui_drawstr_ycenter(map, x, str);
+	return ui_drawstr_xcenter(map, y, str);
+}
+
+int ui_drawstr_ycenter(vu16 *map, size_t x, const char *str)
+{
+	size_t h, y;
+	u8 xpos[TFB_HEIGHT];
+
+	_ui_strdim(str, NULL, &h);
+	for (int i = 0; i <= h; i++)
+		xpos[i] = x;
+
+	y = (TFB_HEIGHT - h) / 2;
+	ui_drawmwidthstr(map, xpos, y, str);
+	return y + h;
+}
+
+int ui_drawstr_ycenterf(vu16 *map, size_t x, const char *fmt, ...)
+{
+	UI_FORMAT_HELPER(fmt, str);
+	return ui_drawstr_ycenter(map, x, str);
 }
 
 void ui_msg(const char *str)
@@ -260,22 +297,20 @@ int ui_menu(int nopt, const char **opt, const char *str)
 {
 	vu16 *map;
 	bool redraw;
-	size_t str_w, str_h, maxsw;
+	size_t maxsw;
 	int opt_y, opt_x, winsz, wins, wine, ret;
 
 	sassert(nopt > 0, "no options provided");
 
-	_ui_strdim(str, &str_w, &str_h);
-	opt_y = str_h + 3;
-
 	map = ui_map(UI_MENUSCR, BG_PROM);
 
 	ui_tilemap_set(map, CHR_OPAQUE);
-	ui_drawstr_xcenter(map, 1, str);
+	opt_y = ui_drawstr_xcenter(map, 1, str) + 3;
 
 	maxsw = 0;
 	for (int i = 0; i < nopt; i++) {
-		size_t slen = strlen(opt[i]);
+		size_t slen = 0;
+		while(opt[i][slen] != '\0') slen++;
 		if (maxsw < slen) maxsw = slen;
 	}
 

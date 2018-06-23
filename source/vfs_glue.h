@@ -20,20 +20,20 @@ int copy_file_ui(const char *path, const char *new);
  */
 int move_file_ui(const char *old, const char *new, bool fallback);
 
-/* get the base filename from a full path */
-const char *path_basename(const char *fpath);
+/* null terminates the last '/' char */
+size_t path_basedir(char *path);
 
-/*
- * copies `path` to `out` up to the base path
- * assumes sizeof(out) >= sizeof(path)
- */
-size_t path_basedir(char *out, const char *path);
-
-/*
- * opens a file with a special path, pretty much auxiliary
- */
+/* opens a file with a special path, pretty much auxiliary */
 int open_compound_path(int mode, const char *fmt, ...);
 
 size_t size_format(char *out, off_t size);
+
+static inline bool path_is_topdir(const char *p) {
+	if (p[0] < VFS_FIRSTMOUNT || p[0] > VFS_LASTMOUNT) return false;
+	if (p[1] != ':') return false;
+	if (p[2] != '/') return false;
+	if (p[3] != '\0') return false;
+	return true;
+}
 
 #endif /* VFS_GLUE_H__ */

@@ -140,10 +140,11 @@ int fat_vfs_open(mount_t *mnt, vf_t *file, const char *path, int mode)
 	if (ff_file == NULL) return -ERR_MEM;
 
 	res = f_open(ff_file, ff_local_path, _ff_vfs_mode(mode));
-	if (res == FR_OK)
+	if (res == FR_OK) {
 		file->priv = ff_file;
-	else
+	} else {
 		free(ff_file);
+	}
 
 	return _ff_err(res);
 }
@@ -223,18 +224,23 @@ int fat_vfs_diropen(mount_t *mnt, vf_t *dir, const char *path)
 	FRESULT res;
 	DIR *dp;
 	char ff_local_path[MAX_PATH + 1];
-	size_t ff_idx = FF_GET_IDX(mnt);
+	size_t ff_idx = FF_GET_IDX(mnt), lastc;
 
 	dp = malloc(sizeof(*dp));
 	if (dp == NULL) return -ERR_MEM;
 
-	snprintf(ff_local_path, MAX_PATH, "%s/%s", FF_LOG_PATH(ff_idx), path);
+	lastc = snprintf(ff_local_path, MAX_PATH, "%s/%s", FF_LOG_PATH(ff_idx), path);
+	if (ff_local_path[lastc - 1] == '/') {
+		/* FATFS doesnt like paths that end with '/' */
+		ff_local_path[lastc - 1] = '\0';
+	}
 	res = f_opendir(dp, ff_local_path);
 
-	if (res == FR_OK)
+	if (res == FR_OK) {
 		dir->priv = dp;
-	else
+	} else {
 		free(dp);
+	}
 
 	return _ff_err(res);
 }
@@ -256,6 +262,7 @@ int fat_vfs_dirnext(mount_t *mnt, vf_t *dir, dirinf_t *next)
 {
 	FRESULT res;
 	FILINFO fno;
+	int flags = 0;
 	DIR *dp = dir->priv;
 
 	res = f_readdir(dp, &fno);
@@ -265,17 +272,10 @@ int fat_vfs_dirnext(mount_t *mnt, vf_t *dir, dirinf_t *next)
 	}
 
 	strcpy(next->path, fno.fname);
+	flags |= (fno.fattrib & AM_DIR) ? VFS_DIR : VFS_FILE;
+	flags |= (fno.fattrib & AM_RDO) ? VFS_RO : VFS_RW;
 
-	if (fno.fattrib & AM_DIR)
-		next->flags |= VFS_DIR;
-	else
-		next->flags |= VFS_FILE;
-
-	if (fno.fattrib & AM_RDO)
-		next->flags |= VFS_RO;
-	else
-		next->flags |= VFS_RW;
-
+	next->flags = flags;
 	return 0;
 }
 

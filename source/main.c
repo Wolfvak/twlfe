@@ -16,8 +16,8 @@ int main(void) {
 	defaultExceptionHandler();
 	ui_reset();
 
-	memfs_init('A');
-	dldi_mount('B');
+	dldi_mount('A');
+	memfs_init('B');
 
 	while(1) fe_mount_menu();
 }

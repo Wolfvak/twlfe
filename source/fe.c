@@ -19,6 +19,8 @@ typedef struct {
 	off_t size;
 } fe_mount_info;
 
+void fe_main(char drv, vu16 *map);
+
 static inline off_t get_mount_size(char drv) {
 	vfs_ioctl_t io;
 	if (!IS_ERR(vfs_ioctl(drv, VFS_IOCTL_SIZE, &io)))
@@ -55,9 +57,8 @@ static size_t get_mount_info(fe_mount_info *info, size_t max) {
 	return ret;
 }
 
-void fe_draw_icon(const char *icon, size_t x, size_t y)
+static inline void fe_draw_icon(vu16 *map, const char *icon, size_t x, size_t y)
 {
-	vu16 *map = ui_map(0, 0);
 	for (size_t _y = 0; _y < 8; _y++) {
 		for (size_t _x = 0; _x < 8; _x++) {
 			ui_drawc(map, *icon, x + _x, y + _y);
@@ -66,30 +67,28 @@ void fe_draw_icon(const char *icon, size_t x, size_t y)
 	}
 }
 
-void fe_main(char drv);
-
 void fe_mount_menu(void)
 {
-	vu16 *map = ui_map(0, 0);
+	vu16 *map = ui_map(MAINSCR, BG_MAIN);
 	fe_mount_info minf[VFS_MOUNTPOINTS];
 	int mcnt = get_mount_info(minf, VFS_MOUNTPOINTS), idx = 0;
 
-	while(true) {
+	while(1) {
 		int keypress;
-		char sizestr[32];
+		char szstr[16];
 		int next_idx, prev_idx;
 
 		swiWaitForVBlank();
 		ui_tilemap_clr(map);
 
-		fe_draw_icon(minf[idx].icon, 12, 4);
+		fe_draw_icon(map, minf[idx].icon, 12, 4);
 		ui_drawstr(map, 12, 13, "^^^^^^^^");
 
 		if (mcnt > 1) {
 			next_idx = (idx + 1) % mcnt;
 			prev_idx = (idx + mcnt - 1) % mcnt;
-			fe_draw_icon(minf[next_idx].icon, 23, 4);
-			fe_draw_icon(minf[prev_idx].icon, 1, 4);
+			fe_draw_icon(map, minf[next_idx].icon, 23, 4);
+			fe_draw_icon(map, minf[prev_idx].icon, 1, 4);
 
 			ui_drawstr(map, 21, 7, "\\\n/");
 			ui_drawstr(map, 10, 7, "/\n\\");
@@ -98,19 +97,16 @@ void fe_mount_menu(void)
 			prev_idx = idx;
 		}
 
-		ui_drawstr_xcenterf(map, 15, "%c:", minf[idx].drv);
-		ui_drawstr_xcenter(map, 16, minf[idx].label);
-
-		strcpy(sizestr, "Size: ");
-		size_format(&sizestr[6], minf[idx].size);
-		ui_drawstr_xcenter(map, 17, sizestr);
+		size_format(szstr, minf[idx].size);
+		ui_drawstr_xcenterf(map, 15, "%c:\n%s", minf[idx].drv, minf[idx].label);
+		ui_drawstr_xcenterf(map, 17, "Size: %s", szstr);
 
 		keypress = ui_waitkey(KEY_LEFT | KEY_RIGHT | KEY_A | KEY_B);
 
 		if (keypress & KEY_LEFT) idx--;
 		else if (keypress & KEY_RIGHT) idx++;
 		else if (keypress & KEY_A) {
-			fe_main(minf[idx].drv);
+			fe_main(minf[idx].drv, map);
 			break;
 		} else if (keypress & KEY_B) {
 			break;

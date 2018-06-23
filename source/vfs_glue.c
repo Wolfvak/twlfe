@@ -91,30 +91,18 @@ int move_file_ui(const char *old, const char *new, bool fallback)
 	return res;
 }
 
-const char *path_basename(const char *fpath)
+size_t path_basedir(char *path)
 {
-	if (fpath == NULL) return NULL;
-	while(*fpath) fpath++;
-	fpath--;
-	while(*fpath == '/') fpath--;
-	while(*fpath != '/') fpath--;
-	fpath++;
-	return fpath;
-}
+	char *path_s = path;
 
-size_t path_basedir(char *out, const char *path)
-{
-	size_t ret = 0;
-	const char *basename = path_basename(path);
+	while(*path) path++;
+	path--;
 
-	if (path == NULL || basename == NULL) return 0;
-	while(&path[ret] != basename) {
-		out[ret] = path[ret];
-		ret++;
-	}
+	while(*path == '/') path--;
+	while(*path != '/') path--;
+	*(++path) = '\0';
 
-	out[ret] = '\0';
-	return ret;
+	return (path - path_s);
 }
 
 int open_compound_path(int mode, const char *fmt, ...)
@@ -130,10 +118,7 @@ int open_compound_path(int mode, const char *fmt, ...)
 	return vfs_open(path, mode);
 }
 
-static const char *format_suf[] = {
-	"B", "KiB", "MiB", "GiB", "TiB", "PiB", "EiB"
-};
-
+/* this should be a gcc intrinsic tbh... */
 static inline size_t ctz64(uint64_t n) {
 	size_t lower = n, upper = n >> 32;
 	if (n == 0) return 0;
@@ -143,25 +128,28 @@ static inline size_t ctz64(uint64_t n) {
 	}
 }
 
+static const char format_suf[] = {
+	'B', 'K', 'M', 'G', 'T', 'P', 'E'
+};
+
 size_t size_format(char *out, off_t size)
 {
-	size_t sz_scale, intp, decp;
+	size_t mtude, intp, decp;
 
 	if (size < 0) {
-		strcpy(out, "negative?");
-		return 0;
+		strcpy(out, "<0?");
+		return 3;
 	} else if (size < 1024) {
 		return sprintf(out, "%d B", (size_t)size);
 	}
 
-	sz_scale = ctz64(size);
-	sz_scale = (sz_scale / 10) * 10;
+	mtude = (ctz64(size) / 10) * 10;
 
-	intp = size >> sz_scale;
+	intp = size >> mtude;
+	decp = ((size - (intp << mtude)) >> (mtude - 10)) % 1000;
+	if (decp >= 100) {
+		decp /= 10;
+	}
 
-	decp = size - (intp << sz_scale);
-	decp >>= sz_scale - 10;
-	decp /= 100;
-
-	return sprintf(out, "%d.%d %s", intp, decp, format_suf[sz_scale / 10]);
+	return sprintf(out, "%d.%d %ciB", intp, decp, format_suf[mtude/10]);
 }

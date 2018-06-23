@@ -35,14 +35,14 @@ ICON     :=
 
 # specify a directory which contains the nitro filesystem
 # this is relative to the Makefile
-NITRO    :=
+# NITRO    :=
 
 #---------------------------------------------------------------------------------
 # options for code generation
 #---------------------------------------------------------------------------------
 ARCH := -marm -mthumb-interwork -march=armv5te -mtune=arm946e-s
 
-CFLAGS   := -g -Wall -O3\
+CFLAGS   := -g -Wall -Os\
             $(ARCH) $(INCLUDE) -DARM9
 CXXFLAGS := $(CFLAGS) -fno-rtti -fno-exceptions
 ASFLAGS  := -g $(ARCH)

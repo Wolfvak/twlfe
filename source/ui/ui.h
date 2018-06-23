@@ -78,12 +78,12 @@ int ui_drawstr_centerf(vu16 *map, const char *fmt, ...);
  * the x coordinate is inferred from the string width in such a way
  * that thestring appears as centered as possible in the X axis
  */
-void ui_drawstr_xcenter(vu16 *map, size_t y, const char *str);
-void ui_drawstr_xcenterf(vu16 *map, size_t y, const char *fmt, ...);
+int ui_drawstr_xcenter(vu16 *map, size_t y, const char *str);
+int ui_drawstr_xcenterf(vu16 *map, size_t y, const char *fmt, ...);
 
 /* same as above, but with the Y axis */
-void ui_drawstr_ycenter(vu16 *map, size_t x, const char *str);
-void ui_drawstr_ycenterf(vu16 *map, size_t x, const char *fmt, ...);
+int ui_drawstr_ycenter(vu16 *map, size_t x, const char *str);
+int ui_drawstr_ycenterf(vu16 *map, size_t x, const char *fmt, ...);
 
 /*
  * displays a formatted message on screen

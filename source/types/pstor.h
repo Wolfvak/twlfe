@@ -23,11 +23,32 @@ typedef struct {
 	char **cache;
 } pstor_t;
 
+
+/*
+ * initializes path store with `bufsz` bytes for the char buffer
+ * and enough space to hold up to `max` elements
+ */
 int pstor_init(pstor_t *ps, size_t bufsz, size_t max);
+
+/* frees any memory taken by the path store */
 void pstor_free(pstor_t *ps);
+
+/* clears all paths */
 void pstor_clear(pstor_t *ps);
-int pstor_concat(pstor_t *ps, const char *str);
+
+/* concatenate a string to the current path */
+int pstor_cat(pstor_t *ps, const char *str);
+
+/* move on to the next path */
+int pstor_finish(pstor_t *ps);
+
+/* copy the (`i`-1)-th path to `out` */
 int pstor_getpath(pstor_t *ps, char *out, size_t max, size_t i);
+
+/* get the current amount of paths in the store */
 size_t pstor_count(pstor_t *ps);
+
+/* get the number of available slots in the store */
+size_t pstor_max(pstor_t *ps);
 
 #endif /* PSTOR_H__ */
