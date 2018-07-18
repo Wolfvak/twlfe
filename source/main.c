@@ -7,7 +7,7 @@
 
 #include "vfs_glue.h"
 
-int dldi_mount(char drive);
+int dldi_mount(char drv);
 int memfs_init(char drv);
 
 void fe_mount_menu(void);
@@ -16,8 +16,6 @@ int main(void) {
 	char drv = 'A';
 	defaultExceptionHandler();
 	ui_reset();
-
-	ui_msgf(UISTR_RED "red " UISTR_WHITE "text, now it's " UISTR_BLUE "blue");
 
 	if (!IS_ERR(dldi_mount(drv))) drv++;
 	if (!IS_ERR(memfs_init(drv))) drv++;

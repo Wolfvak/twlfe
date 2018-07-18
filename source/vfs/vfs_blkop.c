@@ -1,5 +1,7 @@
 #include <nds.h>
 
+#include "global.h"
+
 #include "err.h"
 #include "vfs.h"
 
@@ -38,7 +40,7 @@ int vfs_blk_read(vfs_blk_op_t *op)
 		blk_sz = (rem > dbuf_len) ? dbuf_len : rem;
 		rb = vfs_read(op->fd, dbuf, blk_sz);
 		if (IS_ERR(rb)) break;
-		res = op->cb(rb, dbuf, op->priv);
+		res = op->cb(rb, dbuf, GET_PRIVDATA(op, void*));
 		if (IS_ERR(res)) break;
 
 		rem -= rb;
@@ -70,7 +72,7 @@ int vfs_blk_write(vfs_blk_op_t *op)
 	rem = op->data_len;
 	while(rem) {
 		blk_sz = (rem > dbuf_len) ? dbuf_len : rem;
-		res = op->cb(blk_sz, dbuf, op->priv);
+		res = op->cb(blk_sz, dbuf, GET_PRIVDATA(op, void*));
 		if (IS_ERR(res)) break;
 		wb = vfs_write(op->fd, dbuf, blk_sz);
 		if (IS_ERR(wb)) break;

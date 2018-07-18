@@ -44,11 +44,6 @@ static int scan_dir(pstor_t *ps, const char *dir)
 		res = pstor_cat(ps, inf.path);
 		if (IS_ERR(res)) break;
 
-		if (inf.flags & VFS_DIR) {
-			res = pstor_cat(ps, "/");
-			if (IS_ERR(res)) break;
-		}
-
 		res = pstor_finish(ps);
 		if (IS_ERR(res)) break;
 	}

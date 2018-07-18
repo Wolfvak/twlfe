@@ -1,5 +1,7 @@
 #include <nds.h>
 
+#include "global.h"
+
 #include "err.h"
 #include "vfs.h"
 
@@ -16,28 +18,26 @@ static const char memfs_icon[] = {
     "8X8_ICON"
 };
 
-off_t memfs_read(devfs_entry_t *entry, void *buf, off_t size)
+off_t memfs_read(devfs_entry_t *entry, void *buf, off_t pos, off_t size)
 {
-    uintptr_t src = (uintptr_t)entry->priv + entry->vf->pos;
+    uintptr_t src = GET_PRIVDATA(entry, uintptr_t) + pos;
     memcpy(buf, (void*)src, size);
     return size;
 }
 
-off_t memfs_write(devfs_entry_t *entry, const void *buf, off_t size)
+off_t memfs_write(devfs_entry_t *entry, const void *buf, off_t pos, off_t size)
 {
-    uintptr_t dst = (uintptr_t)entry->priv + entry->vf->pos;
+    uintptr_t dst = GET_PRIVDATA(entry, uintptr_t) + pos;
     memcpy((void*)dst, buf, size);
     return size;
 }
 
 static devfs_entry_t memfs_entries[] = {
-    {.name = "bios", .priv = (void*)0xFFFF0000,
-     .size = 1<<15, .flags = VFS_FILE | VFS_RO},
-    {.name = "itcm", .priv = (void*)0x00000000,
-     .size = 1<<15, .flags = VFS_FILE | VFS_RO},
-    {.name = "mram", .priv = (void*)0x02000000,
-     .size = 1<<22, .flags = VFS_FILE | VFS_RO},
+    {.name = "/bios", .priv = (void*)0xFFFF0000, .size = SIZE_KIB(32), .flags = VFS_FILE | VFS_RO},
+    {.name = "/itcm", .priv = (void*)0x00000000, .size = SIZE_KIB(32), .flags = VFS_FILE | VFS_RO},
+    {.name = "/mram", .priv = (void*)0x02000000, .size = SIZE_MIB(4), .flags = VFS_FILE | VFS_RO},
 };
+
 static devfs_t memfs = {
     .dev_entry = memfs_entries,
     .n_entries = sizeof(memfs_entries)/sizeof(*memfs_entries),

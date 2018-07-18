@@ -4,10 +4,6 @@
 #include <nds.h>
 #include <stdarg.h>
 
-#define SIZE_KIB(x) ((off_t)(x) << 10ULL)
-#define SIZE_MIB(x) ((off_t)(x) << 20ULL)
-#define SIZE_GIB(x) ((off_t)(x) << 30ULL)
-
 /*
  * copies file `path` to `new` and shows the progress
  */

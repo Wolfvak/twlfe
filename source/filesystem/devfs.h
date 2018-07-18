@@ -11,18 +11,18 @@ typedef struct devfs_entry_t {
 	int flags;
 	off_t size;
 
-	vf_t *vf;
 	void *priv;
 } devfs_entry_t;
 
 typedef struct devfs_t {
 	devfs_entry_t *dev_entry;
 	size_t n_entries;
+
 	const char *label;
 	const char *icon;
 
-	off_t (*dev_read)(devfs_entry_t *dev_entry, void *buf, off_t size);
-	off_t (*dev_write)(devfs_entry_t *dev_entry, const void *buf, off_t size);
+	off_t (*dev_read)(devfs_entry_t *dev_entry, void *buf, off_t pos, off_t size);
+	off_t (*dev_write)(devfs_entry_t *dev_entry, const void *buf, off_t pos, off_t size);
 
 	void *priv;
 } devfs_t;

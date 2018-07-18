@@ -42,13 +42,13 @@ enum {
 	COL_MAGENTA	= 6,
 };
 
-#define UISTR_WHITE	"\xFF"
-#define UISTR_BLACK	"\xFE"
-#define UISTR_RED		"\xFD"
-#define UISTR_GREEN	"\xFC"
-#define UISTR_BLUE		"\xFB"
-#define UISTR_YELLOW	"\xFA"
-#define UISTR_MAGENTA	"\xF9"
+#define UI_WHITE	"\xFF"
+#define UI_BLACK	"\xFE"
+#define UI_RED		"\xFD"
+#define UI_GREEN	"\xFC"
+#define UI_BLUE		"\xFB"
+#define UI_YELLOW	"\xFA"
+#define UI_MAGENTA	"\xF9"
 
 #define CCHR_MAX	(255)
 #define CCHR_MIN	(CCHR_MAX - COL_MAGENTA)

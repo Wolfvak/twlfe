@@ -3,13 +3,58 @@
 
 #include <nds.h>
 
+/*
+ * Some basic VFS rules:
+ *
+ * File / Directory paths:
+ *
+ * - all paths MUST be in UTF-8 and the filesystems must recognize ONLY this
+ *   encoding. any necessary conversions must be done on the filesystem layer.
+ *   inlineable functions for UTF-32 <-> UTF-16 <-> UTF-8 conversion are to
+ *   be provided for convenience.
+ *
+ * - all paths must fit in `MAX_PATH` bytes. 1 byte != 1 rune/char.
+ *
+ * - all paths MUST start with a single UPPERCASE drive letter, followed by
+ *   ONE colon (:) and ONE forward slash (/).
+ *
+ * - paths passed to the filesystem layer will always be absolute (no cwd)
+ *   and start after the first colon, or at the first forward slash.
+ *
+ *
+ * file paths:
+ *
+ * - all file paths MUST NOT end with a forward slash (/)
+ *
+ *
+ * Directory paths:
+ *
+ * - all directory paths MUST end with a forward slash (/). this includes
+ *   those retrieved by vfs_dirnext.
+ *
+ *
+ * Global paths:
+ * - path passed to the VFS, "A:/file.ext", "Z:/directory/folder/"
+ *
+ * Local paths:
+ * - path passed to the FS, "/file.ext", "/directory/folder/"
+ *
+ */
+
 #define MAX_PATH	(255)
-#define MAX_FILES	(64)
+#define MAX_FILES	(128)
 
 #define VFS_FIRSTMOUNT	('A')
 #define VFS_LASTMOUNT	('Z')
 
 #define VFS_MOUNTPOINTS	(VFS_LASTMOUNT - VFS_FIRSTMOUNT + 1)
+
+#define VFS_DRVVALID(x)	(((x) >= VFS_FIRSTMOUNT) && ((x) <= VFS_LASTMOUNT))
+#define VFS_IDXVALID(x)	(((x) >= 0) && ((x) < VFS_MOUNTPOINTS))
+
+#define SIZE_KIB(x) ((off_t)(x) << 10ULL)
+#define SIZE_MIB(x) ((off_t)(x) << 20ULL)
+#define SIZE_GIB(x) ((off_t)(x) << 30ULL)
 
 typedef signed long long off_t;
 #define VFS_SIZE_MAX ((off_t)0x7FFFFFFFFFFFFFFFULL)
@@ -21,14 +66,14 @@ typedef union {
 
 typedef struct {
 	const void *ops;	/**< Filesystem operations */
-	int caps;			/**< Permitted operations bitmask */
-	int acts;			/**< Active file handles */
+	int caps;			/**< Capability bitmask */
 
 	void *priv;
 } mount_t;
 
 typedef struct {
 	mount_t *mnt;	/**< Mount drive */
+	int idx;		/**< Mount drive index (zero-based) */
 	int flags;		/**< Entity flags */
 	off_t pos;		/**< File position / directory read iterator */
 
@@ -64,29 +109,28 @@ typedef struct {
 } vfs_ops_t;
 
 enum {
-	VFS_OPEN	= BIT(0),				/**< Entity is open */
+	VFS_OPEN	= BIT(0),			/**< Entity is open */
 
-	VFS_RO		= BIT(1),				/**< Open with read permissions */
-	VFS_WO		= BIT(2),				/**< Open with write permissions */
-	VFS_RW		= VFS_RO | VFS_WO,		/**< Open with RW permissions */
+	VFS_RO		= BIT(1),			/**< Open with read permissions */
+	VFS_WO		= BIT(2),			/**< Open with write permissions */
+	VFS_RW		= VFS_RO | VFS_WO,	/**< Open with RW permissions */
 	VFS_CREATE	= BIT(3) | VFS_WO,	/**< Create new file */
 
-	VFS_FILE	= BIT(4),				/**< Entity is a file */
-	VFS_DIR		= BIT(5),				/**< Entity is a dir */
+	VFS_FILE	= BIT(4),			/**< Entity is a file */
+	VFS_DIR		= BIT(5),			/**< Entity is a dir */
 };
 
 enum {
 	VFS_IOCTL_SIZE,
 	VFS_IOCTL_LABEL,
-	VFS_IOCTL_SERIAL,
 	VFS_IOCTL_ASCII_ICON,
 };
 
-int vfs_state(char drive);
+int vfs_state(int drive);
 
-int vfs_mount(char drive, const mount_t *mnt);
-int vfs_unmount(char drive);
-int vfs_ioctl(char drive, int ctl, vfs_ioctl_t *data);
+int vfs_mount(int drive, mount_t *mnt);
+int vfs_unmount(int drive);
+int vfs_ioctl(int drive, int ctl, vfs_ioctl_t *data);
 
 int vfs_open(const char *path, int mode);
 int vfs_close(int fd);

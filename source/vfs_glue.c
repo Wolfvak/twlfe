@@ -127,13 +127,13 @@ static inline size_t ctz64(uint64_t n) {
 	}
 }
 
-static const char format_suf[] = {
+static const char sizepre[] = {
 	'B', 'K', 'M', 'G', 'T', 'P', 'E'
 };
 
 size_t size_format(char *out, off_t size)
 {
-	size_t mtude, intp, decp;
+	size_t mag, intp, decp;
 
 	if (size < 0) {
 		strcpy(out, "<0?");
@@ -142,13 +142,11 @@ size_t size_format(char *out, off_t size)
 		return sprintf(out, "%d B", (size_t)size);
 	}
 
-	mtude = (ctz64(size) / 10) * 10;
+	mag = (ctz64(size) / 10) * 10;
 
-	intp = size >> mtude;
-	decp = (size - ((size >> mtude) << mtude)) >> (mtude-10);
-	decp *= 1000;
-	decp /= 1024;
+	intp = size >> mag;
+	decp = (size - ((size >> mag) << mag)) >> (mag - 10);
 	if (decp >= 100) decp /= 10;
 
-	return sprintf(out, "%d.%d %ciB", intp, decp, format_suf[mtude/10]);
+	return sprintf(out, "%d.%d %ciB", (int)intp, (int)decp, sizepre[mag/10]);
 }
