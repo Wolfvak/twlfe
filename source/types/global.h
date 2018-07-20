@@ -12,6 +12,8 @@
  * 6) non-shared helpers (font.h, vfd.h)
  */
 
+#include <nds.h>
+
 #define LIKELY(x)	__builtin_expect((x), 1)
 #define UNLIKELY(x)	__builtin_expect((x), 0)
 
@@ -19,5 +21,11 @@
 #define GET_PRIVDATA(x, t)	((t)((x)->priv))
 
 #define CLAMP(x, a, b)		((x) < (a) ? (a) : (((x) > (b) ? (b) : (x))))
+
+#define PROCESS_KEYS(keys) \
+	for (typeof((keys)) _k = keys, _kproc = 1; _k && _kproc; _k &= ~BIT(31 - __builtin_clz(_k))) \
+	switch(_k & BIT(31 - __builtin_clz(_k)))
+
+#define PROCESS_KEYS_STOP _kproc = 0
 
 #endif /* GLOBAL_H__ */

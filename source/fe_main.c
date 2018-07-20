@@ -20,7 +20,10 @@ static int scan_dir(pstor_t *ps, const char *dir)
 	max = pstor_max(ps) - 1;
 
 	dd = vfs_diropen(dir);
-	if (IS_ERR(dd)) return dd;
+	if (IS_ERR(dd)) {
+		ui_msgf("failed to diropen %d", dd);
+		return dd;
+	}
 
 	pstor_reset(ps);
 
@@ -94,17 +97,19 @@ static int fe_filemenu(vu16 *map, int *keys, pstor_t *ps, bp_t *cb)
 		}
 
 		*keys = ui_waitkey(KEY_UP|KEY_DOWN|KEY_LEFT|KEY_RIGHT|KEY_A|KEY_B|KEY_Y|KEY_R);
-		switch(*keys) {
+		PROCESS_KEYS(*keys) {
 			case KEY_Y:
 			case KEY_A:
+				PROCESS_KEYS_STOP;
 				return sel;
 
 			case KEY_B:
+				PROCESS_KEYS_STOP;
 				return 0;
 
 			case KEY_R:
-				if (sel > 0)
-					bp_xor(cb, sel);
+				if (sel > 0) bp_xor(cb, sel);
+				PROCESS_KEYS_STOP;
 				break;
 
 			case KEY_UP:

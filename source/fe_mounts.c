@@ -22,7 +22,7 @@ typedef struct {
 
 void fe_main(char drv, pstor_t *paths, pstor_t *clippaths, vu16 *map);
 
-#define FE_PATHBUF	(SIZE_KIB(128))
+#define FE_PATHBUF	(SIZE_KIB(64))
 #define FE_MAXITEM	(16384)
 
 int fe_mount_state_get(fe_mount_state *mounts, int max)
@@ -43,9 +43,9 @@ int fe_mount_state_get(fe_mount_state *mounts, int max)
 void fe_mount_menu(void)
 {
 	vu16 *map = ui_map(MAINSCR, BG_MAIN);
-	int mcnt = vfs_count(), res;
-	ui_menu_entry *mount_menu;
-	fe_mount_state *mounts;
+	int mcnt = vfs_count(), omcnt, res;
+	ui_menu_entry *mount_menu = NULL;
+	fe_mount_state *mounts = NULL;
 	pstor_t ps, clip;
 
 	if (mcnt == 0) return;
@@ -62,21 +62,47 @@ void fe_mount_menu(void)
 		return;
 	}
 
-	mounts = malloc(sizeof(*mounts) * mcnt);
-	fe_mount_state_get(mounts, mcnt);
-
-	mount_menu = malloc(sizeof(*mount_menu) * mcnt);
-	for (int i = 0; i < mcnt; i++) {
-		mount_menu[i].name = malloc(32);
-		sprintf(mount_menu[i].name, "%c: (%s)", mounts[i].drv, mounts[i].label);
-
-		mount_menu[i].desc = NULL;
-	}
-
+	omcnt = 0;
 	while(1) {
-		int sel = ui_menu(mcnt, mount_menu, "Mount menu");
-		if (sel >= 0) {
-			fe_main(mounts[sel].drv, &ps, &clip, map);
+		int sel;
+
+		/*
+		 * recount and reindex all filesystems
+		 * when one is mounted or unmounted
+		 */
+
+		mcnt = vfs_count();
+
+		if (omcnt != mcnt) {
+			char *namebuf, *descbuf;
+
+			if (mount_menu) {
+				free(mount_menu[0].name);
+				free(mount_menu[0].desc);
+				free(mount_menu);
+			}
+
+			free(mounts);
+
+			omcnt = mcnt;
+
+			mounts = calloc(mcnt, sizeof(*mounts));
+			mount_menu = calloc(mcnt, sizeof(*mounts));
+			namebuf = calloc(mcnt, 24);
+			descbuf = calloc(mcnt, 128);
+
+			fe_mount_state_get(mounts, mcnt);
+
+			for (int i = 0; i < mcnt; i++) {
+				mount_menu[i].name = &namebuf[24 * i];
+				mount_menu[i].desc = &descbuf[128 * i];
+
+				sprintf(mount_menu[i].name, "%c: \"%s\"", mounts[i].drv, mounts[i].label);
+				sprintf(mount_menu[i].desc, "TODO: this should\nbe a description");
+			}
 		}
+
+		sel = ui_menu(mcnt, mount_menu, "Main menu");
+		if (sel >= 0) fe_main(mounts[sel].drv, &ps, &clip, map);
 	}
 }

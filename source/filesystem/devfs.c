@@ -106,13 +106,14 @@ off_t devfs_vfs_size(mount_t *mnt, vf_t *file)
 int devfs_vfs_diropen(mount_t *mnt, vf_t *dir, const char *path)
 {
 	/* subdirs are currently not supported */
-    if (strcmp(path, "/")) return -ERR_NOTFOUND;
-    return 0;
+	if (strcmp(path, "/")) return -ERR_NOTFOUND;
+	SET_PRIVDATA(dir, 1);
+	return 0;
 }
 
 int devfs_vfs_dirclose(mount_t *mnt, vf_t *dir)
 {
-    return 0;
+	return 0;
 }
 
 int devfs_vfs_dirnext(mount_t *mnt, vf_t *dir, dirinf_t *next)

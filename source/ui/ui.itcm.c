@@ -314,9 +314,9 @@ bool ui_askf(const char *fmt, ...)
 int ui_menu(int nopt, const ui_menu_entry *opt, const char *str)
 {
 	int opt_y, opt_xl, opt_xr, winsz, wins, wine, sel;
+	bool redraw, run_menu;
 	vu16 *map, *descmap;
 	size_t maxsw;
-	bool redraw;
 
 	sassert(nopt > 0, "no options provided");
 
@@ -334,12 +334,12 @@ int ui_menu(int nopt, const ui_menu_entry *opt, const char *str)
 		if (maxsw < slen) maxsw = slen;
 	}
 
-	opt_xl = ((TFB_WIDTH - maxsw) / 2) - 2;
+	opt_xl = ((TFB_WIDTH - maxsw) / 2) - 1;
 	if (opt_xl & 1) opt_xl--;
 	if (opt_xl < 0) opt_xl = 0;
 
-	opt_xr = ((TFB_WIDTH + maxsw) / 2) + 2;
-	if (opt_xr & 1) opt_xr--;
+	opt_xr = ((TFB_WIDTH + maxsw) / 2) + 1;
+	if (opt_xr & 1) opt_xr++;
 	if (opt_xr >= TFB_WIDTH) opt_xr = TFB_WIDTH-1;
 
 	sel = 0;
@@ -347,7 +347,8 @@ int ui_menu(int nopt, const ui_menu_entry *opt, const char *str)
 	wins = 0;
 	wine = winsz;
 	redraw = true;
-	while(true) {
+	run_menu = true;
+	while(run_menu) {
 		int pressed;
 		const char *description;
 
@@ -374,25 +375,40 @@ int ui_menu(int nopt, const ui_menu_entry *opt, const char *str)
 		/* TODO: clear map + draw description here */
 
 		pressed = ui_waitkey(KEY_UP | KEY_DOWN | KEY_LEFT | KEY_RIGHT | KEY_A | KEY_B);
-		if (pressed & KEY_UP) sel--;
-		else if (pressed & KEY_DOWN) sel++;
+		PROCESS_KEYS(pressed) {
+			case KEY_UP:
+				sel--;
+				break;
 
-		if (pressed & KEY_LEFT) {
-			if (sel != wins) sel = wins;
-			else sel--;
-		} else if (pressed & KEY_RIGHT) {
-			if (sel != wine-1) sel = wine-1;
-			else sel++;
+			case KEY_DOWN:
+				sel++;
+				break;
+
+			case KEY_LEFT:
+				if (sel != wins) sel = wins;
+				else sel--;
+				break;
+
+			case KEY_RIGHT:
+				if (sel != wine-1) sel = wine-1;
+				else sel++;
+				break;
+
+			case KEY_A:
+				PROCESS_KEYS_STOP;
+				run_menu = false;
+				break;
+
+			case KEY_B:
+				PROCESS_KEYS_STOP;
+				run_menu = false;
+				sel = -1;
+				break;
 		}
 
-		if (pressed & KEY_A) break;
-		else if (pressed & KEY_B) {
-			sel = -1;
-			break;
+		if (run_menu) {
+			sel = CLAMP(sel, 0, nopt-1);
 		}
-
-		if (sel < 0) sel = nopt-1;
-		else if (sel >= nopt) sel = 0;
 
 		if (sel >= wine) {
 			wins = wine;

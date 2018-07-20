@@ -54,8 +54,8 @@ enum {
 #define CCHR_MIN	(CCHR_MAX - COL_MAGENTA)
 
 typedef struct {
-	const char *name;
-	const char *desc;
+	char *name;
+	char *desc;
 } ui_menu_entry;
 
 /*

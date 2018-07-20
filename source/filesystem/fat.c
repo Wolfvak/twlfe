@@ -123,7 +123,7 @@ int fat_vfs_open(mount_t *mnt, vf_t *file, const char *path, int mode)
 	ff_file = malloc(sizeof(*ff_file));
 	if (ff_file == NULL) return -ERR_MEM;
 
-	snprintf(ff_lpath, MAX_PATH, "%s/%s", FF_LOG_PATH(state->drvn), path);
+	snprintf(ff_lpath, MAX_PATH, "%s%s", FF_LOG_PATH(state->drvn), path);
 	res = f_open(ff_file, ff_lpath, _ff_vfs_mode(mode));
 	if (res == FR_OK) {
 		SET_PRIVDATA(file, ff_file);
@@ -155,7 +155,7 @@ int fat_vfs_unlink(mount_t *mnt, const char *path)
 	char ff_lpath[MAX_PATH + 1];
 	fat_state *state = GET_PRIVDATA(mnt, fat_state*);
 
-	pathlen = snprintf(ff_lpath, MAX_PATH, "%s/%s", FF_LOG_PATH(state->drvn), path);
+	pathlen = snprintf(ff_lpath, MAX_PATH, "%s%s", FF_LOG_PATH(state->drvn), path);
 	if (ff_lpath[pathlen-1] == '/') ff_lpath[pathlen-1] = '\0';
 
 	res = f_unlink(ff_lpath);
@@ -169,10 +169,10 @@ int fat_vfs_rename(mount_t *mnt, const char *oldp, const char *newp)
 	char ff_lop[MAX_PATH + 1], ff_lnp[MAX_PATH + 1];
 	fat_state *state = GET_PRIVDATA(mnt, fat_state*);
 
-	pathlen = snprintf(ff_lop, MAX_PATH, "%s/%s", FF_LOG_PATH(state->drvn), oldp);
+	pathlen = snprintf(ff_lop, MAX_PATH, "%s%s", FF_LOG_PATH(state->drvn), oldp);
 	if (ff_lop[pathlen-1] == '/') ff_lop[pathlen-1] = '\0';
 
-	pathlen = snprintf(ff_lnp, MAX_PATH, "%s/%s", FF_LOG_PATH(state->drvn), newp);
+	pathlen = snprintf(ff_lnp, MAX_PATH, "%s%s", FF_LOG_PATH(state->drvn), newp);
 	if (ff_lnp[pathlen-1] == '/') ff_lnp[pathlen-1] = '\0';
 
 	res = f_rename(ff_lop, ff_lnp);
@@ -218,7 +218,7 @@ int fat_vfs_mkdir(mount_t *mnt, const char *path)
 	char ff_lpath[MAX_PATH + 1];
 	fat_state *state = GET_PRIVDATA(mnt, fat_state*);
 
-	pathlen = snprintf(ff_lpath, MAX_PATH, "%s/%s", FF_LOG_PATH(state->drvn), path);
+	pathlen = snprintf(ff_lpath, MAX_PATH, "%s%s", FF_LOG_PATH(state->drvn), path);
 	if (ff_lpath[pathlen-1] == '/') ff_lpath[pathlen-1] = '\0';
 
 	res = f_mkdir(ff_lpath);
@@ -236,7 +236,7 @@ int fat_vfs_diropen(mount_t *mnt, vf_t *dir, const char *path)
 	dp = malloc(sizeof(*dp));
 	if (dp == NULL) return -ERR_MEM;
 
-	pathlen = snprintf(ff_lpath, MAX_PATH, "%s/%s", FF_LOG_PATH(state->drvn), path);
+	pathlen = snprintf(ff_lpath, MAX_PATH, "%s%s", FF_LOG_PATH(state->drvn), path);
 	if (ff_lpath[pathlen-1] == '/') ff_lpath[pathlen-1] = '\0';
 
 	res = f_opendir(dp, ff_lpath);

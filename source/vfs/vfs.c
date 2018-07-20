@@ -443,8 +443,8 @@ int vfs_dirclose(int dd)
 	mnt = dir->mnt;
 	res = VFS_CALL_OP(mnt, dirclose, mnt, dir);
 	if (!IS_ERR(res)) {
-		vfd_return(dd);
 		_vfs_actives_dec(dir->idx);
+		vfd_return(dd);
 	}
 
 	return res;
@@ -491,6 +491,7 @@ const char *vfs_ioctl_label(int drive)
 	vfs_ioctl_t io;
 
 	res = vfs_ioctl(drive, VFS_IOCTL_LABEL, &io);
-	if (IS_ERR(res)) return "Invalid label";
+	if (IS_ERR(res)) return "No filesystem";
+	else if (io.string[0] == '\0') return "No label";
 	return io.string;
 }
