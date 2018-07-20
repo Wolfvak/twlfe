@@ -1,6 +1,10 @@
 #ifndef BP_H__
 #define BP_H__
 
+#include <nds.h>
+
+#include "global.h"
+
 /* size of the bitpack atom in bytes / bits */
 #define BP_USZ		(sizeof(size_t))
 #define BP_UBITS	(BP_USZ * 8)

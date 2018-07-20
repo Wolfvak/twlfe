@@ -1,5 +1,7 @@
 #include <nds.h>
 
+#include "global.h"
+
 #include "err.h"
 
 static const char *errstr[] = {

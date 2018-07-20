@@ -4,6 +4,7 @@
 #include <nds.h>
 
 #include "err.h"
+
 #include "vfs.h"
 
 typedef struct devfs_entry_t {

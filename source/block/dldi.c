@@ -1,11 +1,14 @@
 #include <nds.h>
 #include <nds/arm9/dldi.h>
 
+#include "global.h"
 #include "err.h"
+
 #include "vfs.h"
 
-#include "ff.h"
 #include "fat.h"
+
+#include "ff.h"
 
 int dldi_init(void)
 {

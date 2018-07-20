@@ -1,6 +1,7 @@
 #include <nds.h>
 
 #include "err.h"
+
 #include "vfs.h"
 
 typedef int (*vfs_blk_cb)(off_t blk_len, void *buf, void *priv);

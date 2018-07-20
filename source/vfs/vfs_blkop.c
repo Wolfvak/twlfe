@@ -1,8 +1,8 @@
 #include <nds.h>
 
 #include "global.h"
-
 #include "err.h"
+
 #include "vfs.h"
 
 #include "vfs_blkop.h"

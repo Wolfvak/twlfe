@@ -1,8 +1,8 @@
 #ifndef UI_H__
 #define UI_H__
 
-#include <nds.h>
 #include <stdarg.h>
+#include <nds.h>
 
 #include "global.h"
 

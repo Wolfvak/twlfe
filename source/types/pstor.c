@@ -1,6 +1,8 @@
 #include <nds.h>
 
+#include "global.h"
 #include "err.h"
+
 #include "pstor.h"
 
 int pstor_init(pstor_t *ps, size_t bufsz, size_t max)

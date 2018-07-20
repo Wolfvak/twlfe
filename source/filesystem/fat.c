@@ -1,13 +1,14 @@
-#include <nds.h>
 #include <stdio.h>
+#include <nds.h>
 
 #include "global.h"
 
 #include "err.h"
 #include "vfs.h"
 
-#include "ff.h"
 #include "fat.h"
+
+#include "ff.h"
 
 #define FF_LOG_PATH(x)	((char[]){'0' + (x), ':', '\0'})
 

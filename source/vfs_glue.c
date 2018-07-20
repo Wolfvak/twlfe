@@ -1,11 +1,13 @@
-#include <nds.h>
 #include <stdio.h>
 #include <stdarg.h>
+#include <nds.h>
 
+#include "global.h"
 #include "err.h"
-#include "vfs.h"
 
 #include "ui.h"
+#include "vfs.h"
+
 #include "vfs_glue.h"
 #include "vfs_blkop.h"
 

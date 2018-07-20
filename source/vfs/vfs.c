@@ -1,9 +1,10 @@
 #include <nds.h>
 
 #include "global.h"
-
 #include "err.h"
+
 #include "vfs.h"
+
 #include "vfd.h"
 
 #define VFS_CALL_OP(mnt, op, ...) ({ \

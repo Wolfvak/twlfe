@@ -1,8 +1,9 @@
 #ifndef VFS_GLUE_H__
 #define VFS_GLUE_H__
 
-#include <nds.h>
 #include <stdarg.h>
+
+#include <nds.h>
 
 /*
  * copies file `path` to `new` and shows the progress

@@ -1,9 +1,10 @@
-#include <nds.h>
 #include <stdarg.h>
 #include <stdio.h>
+#include <nds.h>
+
+#include "global.h"
 
 #include "ui.h"
-#include "global.h"
 
 #include "font.h"
 

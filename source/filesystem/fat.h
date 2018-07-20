@@ -4,7 +4,10 @@
 #include <nds.h>
 
 #include "err.h"
+
 #include "vfs.h"
+
+#include "ff.h"
 
 #define FAT_SECT_SIZE	((off_t)512ULL)
 #define FF_MAX_DISK 	(10)

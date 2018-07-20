@@ -1,20 +1,15 @@
+#include <stdio.h>
 #include <nds.h>
 
-#include <stdio.h>
-#include <string.h>
-
+#include "global.h"
 #include "err.h"
+
 #include "ui.h"
 #include "vfs.h"
-
-#include "global.h"
 
 #include "bp.h"
 #include "pstor.h"
 #include "vfs_glue.h"
-
-#define FE_PATHBUF	(SIZE_KIB(2048))
-#define FE_MAXITEM	(16384)
 
 static int scan_dir(pstor_t *ps, const char *dir)
 {
@@ -64,7 +59,7 @@ static inline bool path_is_dir(char *p, size_t l) {
 static int fe_filemenu(vu16 *map, int *keys, pstor_t *ps, bp_t *cb)
 {
 	int res, sel = 0, base = 0, count = pstor_count(ps);
-	bool redraw_menu = true;
+	bool redraw_menu;
 
 	if (count == 0) {
 		*keys = 0;
@@ -73,6 +68,7 @@ static int fe_filemenu(vu16 *map, int *keys, pstor_t *ps, bp_t *cb)
 
 	bp_clearall(cb);
 
+	redraw_menu = true;
 	while(1) {
 		int end = CLAMP(base + FE_PSTORM_YSZ, 0, count);
 
@@ -107,7 +103,8 @@ static int fe_filemenu(vu16 *map, int *keys, pstor_t *ps, bp_t *cb)
 				return 0;
 
 			case KEY_R:
-				bp_xor(cb, sel);
+				if (sel > 0)
+					bp_xor(cb, sel);
 				break;
 
 			case KEY_UP:
@@ -190,22 +187,23 @@ void fe_main(char drv, pstor_t *paths, pstor_t *clippaths, vu16 *map)
 				path_basedir(cwd);
 			}
 		} else {
-			char fpath[MAX_PATH + 1];
-			int cwdlen = strlen(cwd), fpath_rem = MAX_PATH - cwdlen;
+			char fpath[MAX_PATH + 1] = {0};
+			int cwdlen, fpath_rem;
 
-			memset(fpath, 0, MAX_PATH + 1);
 			strcpy(fpath, cwd);
+			cwdlen = strlen(fpath);
+			fpath_rem = MAX_PATH - cwdlen;
 
 			if (keys & KEY_Y) {
 				pstor_reset(clippaths);
 
 				while(bp_setcnt(&cb)) {
-					char fpath[MAX_PATH + 1];
 					int idx = bp_find_set(&cb);
 
 					bp_clr(&cb, idx);
 					pstor_get(paths, &fpath[cwdlen], fpath_rem, idx);
-					pstor_add(clippaths, &fpath[cwdlen]);
+					pstor_add(clippaths, fpath);
+					ui_msgf("copied %s to clipboard", fpath);
 				}
 				bp_clearall(&cb);
 			} else if (keys & KEY_A) {

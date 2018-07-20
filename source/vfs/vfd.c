@@ -1,6 +1,7 @@
 #include <nds.h>
 
 #include "vfs.h"
+
 #include "vfd.h"
 
 static vf_t vfds[MAX_FILES];

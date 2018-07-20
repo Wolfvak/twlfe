@@ -1,14 +1,11 @@
 #include <nds.h>
 
 #include "global.h"
-
 #include "err.h"
+
 #include "vfs.h"
 
 #include "devfs.h"
-
-#define DEVFS_FIDX_SET(f,s)	SET_PRIVDATA(f, s)
-#define DEVFS_FIDX_GET(f)	GET_PRIVDATA(f, size_t)
 
 int devfs_vfs_mount(mount_t *mnt)
 {
@@ -47,7 +44,7 @@ int devfs_vfs_open(mount_t *mnt, vf_t *file, const char *path, int mode)
 
 	/*
 	 * look for the desired file, return an error if not found
-	 * yes, it's done with a dumb strcasecmp comparison
+	 * yes, it's currently done with a dumb strcasecmp comparison
 	 * deal with it
 	 */
 	for (fidx = 0; fidx < dfs->n_entries; fidx++) {
@@ -61,7 +58,7 @@ int devfs_vfs_open(mount_t *mnt, vf_t *file, const char *path, int mode)
 	if ((dev_entry->flags & mode) != mode) return -ERR_ARG;
 
 	/* mark the file entry index */
-	DEVFS_FIDX_SET(file, fidx);
+	SET_PRIVDATA(file, fidx);
 	return 0;
 }
 
@@ -73,7 +70,7 @@ int devfs_vfs_close(mount_t *mnt, vf_t *file)
 off_t devfs_vfs_read(mount_t *mnt, vf_t *file, void *buf, off_t size)
 {
 	devfs_t *dfs = GET_PRIVDATA(mnt, devfs_t*);
-	devfs_entry_t *dev_entry = &dfs->dev_entry[DEVFS_FIDX_GET(file)];
+	devfs_entry_t *dev_entry = &dfs->dev_entry[GET_PRIVDATA(file, size_t)];
 	off_t rb = size;
 
 	/* clamp the position to bounds */
@@ -89,7 +86,7 @@ off_t devfs_vfs_write(mount_t *mnt, vf_t *file, const void *buf, off_t size)
 {
 	/* basically the same thing as devfs_vfs_read */
 	devfs_t *dfs = GET_PRIVDATA(mnt, devfs_t*);
-	devfs_entry_t *dev_entry = &dfs->dev_entry[DEVFS_FIDX_GET(file)];
+	devfs_entry_t *dev_entry = &dfs->dev_entry[GET_PRIVDATA(file, size_t)];
 	off_t wb = size;
 
 	if ((file->pos + wb) > dev_entry->size)
@@ -102,7 +99,7 @@ off_t devfs_vfs_write(mount_t *mnt, vf_t *file, const void *buf, off_t size)
 off_t devfs_vfs_size(mount_t *mnt, vf_t *file)
 {
 	devfs_t *dfs = GET_PRIVDATA(mnt, devfs_t*);
-	devfs_entry_t *dev_entry = &dfs->dev_entry[DEVFS_FIDX_GET(file)];
+	devfs_entry_t *dev_entry = &dfs->dev_entry[GET_PRIVDATA(file, size_t)];
 	return dev_entry->size;
 }
 

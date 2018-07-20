@@ -1,9 +1,9 @@
+#include <stdio.h>
 #include <nds.h>
 
-#include <stdio.h>
-#include <string.h>
-
+#include "global.h"
 #include "err.h"
+
 #include "ui.h"
 #include "vfs.h"
 

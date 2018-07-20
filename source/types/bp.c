@@ -1,10 +1,9 @@
 #include <nds.h>
-#include <string.h>
-
-#include "bp.h"
-#include "err.h"
 
 #include "global.h"
+#include "err.h"
+
+#include "bp.h"
 
 int bp_init(bp_t *bp, int n)
 {
@@ -81,12 +80,13 @@ int bp_find_clr(bp_t *bp)
 	i = BP_IDX(bp->lastc);
 
 	while(1) {
-		size_t w = bp->map[i++];
+		size_t w = bp->map[i];
 		if (w != BP_ALLSET) {
-			ret = (BP_UBITS - 1) - __builtin_clz(w);
+			ret = (BP_UBITS - 1) - __builtin_clz(~w);
 			break;
 		}
 
+		i++;
 		if (UNLIKELY(i >= BP_SIZEW(bp->max)))
 			i = 0;
 	}
@@ -103,12 +103,13 @@ int bp_find_set(bp_t *bp)
 	i = BP_IDX(bp->lasts);
 
 	while(1) {
-		size_t w = bp->map[i++];
+		size_t w = bp->map[i];
 		if (w != BP_ALLCLR) {
-			ret = (BP_UBITS - 1) - __builtin_clz(~w);
+			ret = (BP_UBITS - 1) - __builtin_clz(w);
 			break;
 		}
 
+		i++;
 		if (UNLIKELY(i >= BP_SIZEW(bp->max)))
 			i = 0;
 	}
