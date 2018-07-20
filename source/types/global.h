@@ -7,4 +7,6 @@
 #define SET_PRIVDATA(x, d)	((x)->priv = ((void*)(d)))
 #define GET_PRIVDATA(x, t)	((t)((x)->priv))
 
+#define CLAMP(x, a, b)		((x) < (a) ? (a) : (((x) > (b) ? (b) : (x))))
+
 #endif /* GLOBAL_H__ */

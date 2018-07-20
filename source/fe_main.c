@@ -27,12 +27,9 @@ static int scan_dir(pstor_t *ps, const char *dir)
 	dd = vfs_diropen(dir);
 	if (IS_ERR(dd)) return dd;
 
-	pstor_clear(ps);
+	pstor_reset(ps);
 
-	res = pstor_cat(ps, "../");
-	if (IS_ERR(res)) return res;
-
-	res = pstor_finish(ps);
+	res = pstor_add(ps, "../");
 	if (IS_ERR(res)) return res;
 
 	for (int i = 0; i < max; i++) {
@@ -41,15 +38,13 @@ static int scan_dir(pstor_t *ps, const char *dir)
 		res = vfs_dirnext(dd, &inf);
 		if (IS_ERR(res)) break;
 
-		res = pstor_cat(ps, inf.path);
-		if (IS_ERR(res)) break;
-
-		res = pstor_finish(ps);
+		res = pstor_add(ps, inf.path);
 		if (IS_ERR(res)) break;
 	}
 
 	vfs_dirclose(dd);
 	if (IS_ERR(res) && (res != -ERR_NOTFOUND)) return res;
+
 	return 0;
 }
 
@@ -62,24 +57,24 @@ static inline bool path_is_dir(char *p, size_t l) {
  * pathstore and draws strings in different positions
  */
 
+#define FE_PSTORM_X		(2)
 #define FE_PSTORM_Y		(2)
 #define FE_PSTORM_YSZ	(TFB_HEIGHT - 2)
-static int fe_filemenu(vu16 *map, pstor_t *ps, bp_t *clipboard)
+
+static int fe_filemenu(vu16 *map, int *keys, pstor_t *ps, bp_t *cb)
 {
 	int res, sel = 0, base = 0, count = pstor_count(ps);
 	bool redraw_menu = true;
 
 	if (count == 0) {
+		*keys = 0;
 		return -1;
 	}
 
-	bp_clearall(clipboard);
+	bp_clearall(cb);
 
 	while(1) {
-		int pressed, end;
-
-		end = base + FE_PSTORM_YSZ;
-		if (end > count) end = count;
+		int end = CLAMP(base + FE_PSTORM_YSZ, 0, count);
 
 		if (UNLIKELY(redraw_menu)) {
 			redraw_menu = false;
@@ -89,55 +84,65 @@ static int fe_filemenu(vu16 *map, pstor_t *ps, bp_t *clipboard)
 
 			for (int i = base; i < end; i++) {
 				char drawpath[MAX_PATH + 1];
-				res = pstor_getpath(ps, drawpath, MAX_PATH, i);
-				if (IS_ERR(res)) {
-					ui_msgf("Failed to get path:\n%s", err_getstr(res));
-					return res;
-				}
-				ui_drawstr(map, 2, i - base + FE_PSTORM_Y, drawpath);
+				res = pstor_get(ps, drawpath, MAX_PATH, i);
+				if (IS_ERR(res)) return res;
+
+				ui_drawstr(map, FE_PSTORM_X, FE_PSTORM_Y + i - base, drawpath);
 			}
 		}
 
 		for (int i = base; i < end; i++) {
-			ui_drawc(map, (i == sel) ? '>' : ' ', 0, i - base + FE_PSTORM_Y);
-			ui_drawc(map, bp_tst(clipboard, i) ? '^' : ' ', 1, i - base + FE_PSTORM_Y);
+			int yc = FE_PSTORM_Y + i - base;
+			ui_drawc(map, (i == sel) ? '>' : ' ', 0, yc);
+			ui_drawc(map, bp_tst(cb, i) ? '^' : ' ', 1, yc);
 		}
 
-		pressed = ui_waitkey(KEY_UP|KEY_DOWN|KEY_LEFT|KEY_RIGHT|KEY_A|KEY_B|KEY_R);
+		*keys = ui_waitkey(KEY_UP|KEY_DOWN|KEY_LEFT|KEY_RIGHT|KEY_A|KEY_B|KEY_Y|KEY_R);
+		switch(*keys) {
+			case KEY_Y:
+			case KEY_A:
+				return sel;
 
-		if (pressed & KEY_A) {
-			break;
-		} else if (pressed & KEY_B) {
-			sel = -1;
-			break;
-		} else if ((pressed & KEY_R) && (sel > 0)) {
-			bp_xor(clipboard, sel);
+			case KEY_B:
+				return 0;
+
+			case KEY_R:
+				bp_xor(cb, sel);
+				break;
+
+			case KEY_UP:
+				sel--;
+				break;
+
+			case KEY_DOWN:
+				sel++;
+				break;
+
+			case KEY_LEFT:
+				sel -= FE_PSTORM_YSZ;
+				break;
+
+			case KEY_RIGHT:
+				sel += FE_PSTORM_YSZ;
+				break;
+
+			default:
+				break;
 		}
 
-		if (pressed & KEY_UP) {
-			sel--;
-		} else if (pressed & KEY_DOWN) {
-			sel++;
-		} else if (pressed & KEY_LEFT) {
-			sel -= FE_PSTORM_YSZ;
-		} else if (pressed & KEY_RIGHT) {
-			sel += FE_PSTORM_YSZ;
-		}
-
-		if (sel < 0) sel = 0;
-		else if (sel >= count) sel = count-1;
+		sel = CLAMP(sel, 0, count - 1);
 
 		if (sel >= end) {
 			base = end;
 			end += FE_PSTORM_YSZ;
-			if (end > count) end = count;
+			end = CLAMP(end, 0, count);
 			redraw_menu = true;
 		}
 
 		if (sel < base) {
 			end = base;
 			base -= FE_PSTORM_YSZ;
-			if (base < 0) base = 0;
+			base = CLAMP(base, 0, count);
 			redraw_menu = true;
 		}
 	}
@@ -145,37 +150,76 @@ static int fe_filemenu(vu16 *map, pstor_t *ps, bp_t *clipboard)
 	return sel;
 }
 
-void fe_main(char drv, pstor_t *paths, bp_t *clipboard, vu16 *map)
-{	
+void fe_main(char drv, pstor_t *paths, pstor_t *clippaths, vu16 *map)
+{
 	char cwd[MAX_PATH + 1];
-	int res, sel;
+	int res, sel, rectr;
+	bp_t cb;
 
-	if (pstor_max(paths) != bp_maxcnt(clipboard)) {
+	if (pstor_max(paths) != pstor_max(clippaths)) {
 		ui_msg("someone seriously needs to\npunch Wolfvak right now");
+		return;
+	}
+
+	if (bp_init(&cb, pstor_max(paths)) < 0) {
+		ui_msg("failed to allocate clipboard? what?");
 		return;
 	}
 
 	sprintf(cwd, "%c:/", drv);
 
+	rectr = 0;
 	while(1) {
+		int keys;
+
+		bp_clearall(&cb);
+
 		res = scan_dir(paths, cwd);
 		if (IS_ERR(res)) {
 			ui_msgf("Failed to scan dir\n\"%s\"\n%s", cwd, err_getstr(res));
 			break;
 		}
 
-		sel = fe_filemenu(map, paths, clipboard);
-		if (sel <= 0) {
-			if (path_is_topdir(cwd)) break;
-			path_basedir(cwd);
+		sel = fe_filemenu(map, &keys, paths, &cb);
+		if (sel < 0) {
+			break;
+		} else if (sel == 0) {
+			if (rectr == 0) break;
+			else {
+				rectr--;
+				path_basedir(cwd);
+			}
 		} else {
 			char fpath[MAX_PATH + 1];
-			int len = pstor_getpath(paths, fpath, MAX_PATH, sel);
-			if (path_is_dir(fpath, len)) {
-				strcat(cwd, fpath);
-			} else {
-				ui_msgf("is a file");
+			int cwdlen = strlen(cwd), fpath_rem = MAX_PATH - cwdlen;
+
+			memset(fpath, 0, MAX_PATH + 1);
+			strcpy(fpath, cwd);
+
+			if (keys & KEY_Y) {
+				pstor_reset(clippaths);
+
+				while(bp_setcnt(&cb)) {
+					char fpath[MAX_PATH + 1];
+					int idx = bp_find_set(&cb);
+
+					bp_clr(&cb, idx);
+					pstor_get(paths, &fpath[cwdlen], fpath_rem, idx);
+					pstor_add(clippaths, &fpath[cwdlen]);
+				}
+				bp_clearall(&cb);
+			} else if (keys & KEY_A) {
+				int plen = pstor_get(paths, &fpath[cwdlen], fpath_rem, sel);
+				if (path_is_dir(fpath, cwdlen + plen)) {
+					rectr++;
+					strcpy(&cwd[cwdlen], &fpath[cwdlen]);
+				} else {
+					//fe_file_menu(fpath);
+					ui_msgf("you picked\n\"%s\"", fpath);
+				}
 			}
 		}
 	}
+
+	bp_free(&cb);
 }

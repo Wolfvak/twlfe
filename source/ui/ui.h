@@ -53,6 +53,11 @@ enum {
 #define CCHR_MAX	(255)
 #define CCHR_MIN	(CCHR_MAX - COL_MAGENTA)
 
+typedef struct {
+	const char *name;
+	const char *desc;
+} ui_menu_entry;
+
 /*
  * waits for one of the keys in `keymask` to be pressed
  * includes key debounce in case the key is already held down
@@ -144,8 +149,8 @@ bool ui_askf(const char *fmt, ...);
  * displays `msg` as header and `nopt` options below
  * returns option index or -1 if menu was cancelled
  */
-int ui_menu(int nopt, const char **opt, const char *msg);
-int ui_menuf(int nopt, const char **opt, const char *fmt, ...);
+int ui_menu(int nopt, const ui_menu_entry *opt, const char *msg);
+int ui_menuf(int nopt, const ui_menu_entry *opt, const char *fmt, ...);
 
 /*
  * displays `msg` and prompts the user for input:

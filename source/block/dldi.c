@@ -7,17 +7,6 @@
 #include "ff.h"
 #include "fat.h"
 
-const char dldi_icon[] = {
-	"--------"
-	"|      |"
-	"| DLDI |"
-	"|      |"
-	"\\      |"
-	" -------"
-	"        "
-	"        "
-};
-
 int dldi_init(void)
 {
 	const DISC_INTERFACE *dldi = dldiGetInternal();
@@ -55,5 +44,5 @@ static const fat_disk_ops fat_ops = {
 
 int dldi_mount(char drive)
 {
-	return fat_mount(drive, &fat_ops, dldi_icon);
+	return fat_mount(drive, &fat_ops);
 }

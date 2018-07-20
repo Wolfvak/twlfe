@@ -10,14 +10,12 @@
 #include "fat.h"
 
 #define FF_LOG_PATH(x)	((char[]){'0' + (x), ':', '\0'})
-#define FF_MNT_IDX(mnt)	((GET_PRIVDATA((mnt), fat_state*))->drvn)
 
 typedef struct {
-	char label[16];
-	int drvn;
-
 	const fat_disk_ops *dops;
-	const char *icon;
+	unsigned int drvn;
+	char label[12];
+
 	FATFS fs;
 } fat_state;
 
@@ -42,24 +40,26 @@ static int _ff_vfs_mode(int vfs_mode)
 
 static int _ff_err(int err)
 {
-	switch(err) {
-		case FR_OK:
-			return 0;
-		case FR_NOT_READY:
-		case FR_NO_FILESYSTEM:
-		case FR_WRITE_PROTECTED:
-			return -ERR_NOTREADY;
-		case FR_NO_FILE:
-		case FR_NO_PATH:
-			return -ERR_NOTFOUND;
-		case FR_INVALID_NAME:
-		case FR_INVALID_DRIVE:
-			return -ERR_ARG;
-		case FR_NOT_ENOUGH_CORE:
-			return -ERR_MEM;
-		default:
-			return -ERR_DEV;
-	}
+	static const u8 ff_err_ttbl[] = {
+		[FR_OK] = 0,
+		[FR_DISK_ERR] = ERR_IO,
+		[FR_INT_ERR] = ERR_DEV,
+		[FR_NOT_READY] = ERR_NOTREADY,
+		[FR_NO_FILE] = ERR_NOTFOUND,
+		[FR_NO_PATH] = ERR_NOTFOUND,
+		[FR_INVALID_NAME] = ERR_ARG,
+		[FR_DENIED] = ERR_ARG,
+		[FR_EXIST] = ERR_ARG,
+		[FR_INVALID_OBJECT] = ERR_MEM,
+		[FR_WRITE_PROTECTED] = ERR_NOTREADY,
+		[FR_INVALID_DRIVE] = ERR_ARG,
+		[FR_NOT_ENABLED] = ERR_NOTREADY,
+		[FR_NO_FILESYSTEM] = ERR_IO,
+		[FR_NOT_ENOUGH_CORE] = ERR_MEM,
+		[FR_TOO_MANY_OPEN_FILES] = ERR_MEM,
+		[FR_INVALID_PARAMETER] = ERR_ARG,
+	};
+	return -ff_err_ttbl[err];
 }
 
 int fat_vfs_mount(mount_t *mnt)
@@ -102,15 +102,11 @@ int fat_vfs_ioctl(mount_t *mnt, int ctl, vfs_ioctl_t *data)
 			return -ERR_ARG;
 
 		case VFS_IOCTL_SIZE:
-			data->intval = (off_t)(fs->n_fatent - 2) * (off_t)(fs->csize) * FAT_SECT_SIZE;
+			data->size = (off_t)(fs->n_fatent - 2) * (off_t)(fs->csize) * FAT_SECT_SIZE;
 			break;
 
 		case VFS_IOCTL_LABEL:
-			data->strval = state->label;
-			break;
-
-		case VFS_IOCTL_ASCII_ICON:
-			data->strval = state->icon;
+			data->string = state->label;
 			break;
 	}
 	return 0;
@@ -176,7 +172,7 @@ int fat_vfs_rename(mount_t *mnt, const char *oldp, const char *newp)
 	if (ff_lop[pathlen-1] == '/') ff_lop[pathlen-1] = '\0';
 
 	pathlen = snprintf(ff_lnp, MAX_PATH, "%s/%s", FF_LOG_PATH(state->drvn), newp);
-	if (ff_lnp[pathlen-1] == '/') ff_lop[pathlen-1] = '\0';
+	if (ff_lnp[pathlen-1] == '/') ff_lnp[pathlen-1] = '\0';
 
 	res = f_rename(ff_lop, ff_lnp);
 	return _ff_err(res);
@@ -312,7 +308,7 @@ static const vfs_ops_t fat_ops = {
 	.dirnext = fat_vfs_dirnext,
 };
 
-int fat_mount(char drive, const fat_disk_ops *disk_ops, const char *icon)
+int fat_mount(char drive, const fat_disk_ops *disk_ops)
 {
 	int res;
 	size_t idx;
@@ -340,9 +336,7 @@ int fat_mount(char drive, const fat_disk_ops *disk_ops, const char *icon)
 
 	memset(state->label, 0, sizeof(state->label));
 	state->drvn = idx;
-
 	state->dops = disk_ops;
-	state->icon = icon;
 
 	res = vfs_mount(drive, mnt);
 	if (IS_ERR(res)) {

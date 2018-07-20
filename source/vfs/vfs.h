@@ -60,8 +60,9 @@ typedef signed long long off_t;
 #define VFS_SIZE_MAX ((off_t)0x7FFFFFFFFFFFFFFFULL)
 
 typedef union {
-	off_t intval;
-	const char *strval;
+	off_t size;
+	const char *string;
+	const void *data;
 } vfs_ioctl_t;
 
 typedef struct {
@@ -123,9 +124,9 @@ enum {
 enum {
 	VFS_IOCTL_SIZE,
 	VFS_IOCTL_LABEL,
-	VFS_IOCTL_ASCII_ICON,
 };
 
+int vfs_count(void);
 int vfs_state(int drive);
 
 int vfs_mount(int drive, mount_t *mnt);
@@ -146,5 +147,8 @@ int vfs_mkdir(const char *path);
 int vfs_diropen(const char *path);
 int vfs_dirclose(int dd);
 int vfs_dirnext(int dd, dirinf_t *next);
+
+off_t vfs_ioctl_size(int drive);
+const char *vfs_ioctl_label(int drive);
 
 #endif // VFS_H__

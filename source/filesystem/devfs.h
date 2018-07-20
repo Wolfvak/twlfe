@@ -19,7 +19,6 @@ typedef struct devfs_t {
 	size_t n_entries;
 
 	const char *label;
-	const char *icon;
 
 	off_t (*dev_read)(devfs_entry_t *dev_entry, void *buf, off_t pos, off_t size);
 	off_t (*dev_write)(devfs_entry_t *dev_entry, const void *buf, off_t pos, off_t size);

@@ -29,15 +29,11 @@ int devfs_vfs_ioctl(mount_t *mnt, int ctl, vfs_ioctl_t *data)
 			return -ERR_ARG;
 
 		case VFS_IOCTL_SIZE:
-			data->intval = 0;
+			data->size = 0;
 			break;
 
 		case VFS_IOCTL_LABEL:
-			data->strval = dfs->label;
-			break;
-
-		case VFS_IOCTL_ASCII_ICON:
-			data->strval = dfs->icon;
+			data->string = dfs->label;
 			break;
 	}
 	return 0;
@@ -129,7 +125,7 @@ int devfs_vfs_dirnext(mount_t *mnt, vf_t *dir, dirinf_t *next)
 
     /* past the last file - return an error */
     if (idx >= dfs->n_entries) return -ERR_NOTFOUND;
-    strcpy(next->path, dfs->dev_entry[idx].name);
+    strcpy(next->path, &(dfs->dev_entry[idx].name)[1]);
     next->flags = dfs->dev_entry[idx].flags;
     return 0;
 }

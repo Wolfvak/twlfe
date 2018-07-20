@@ -3,6 +3,7 @@
 #include <stdio.h>
 
 #include "ui.h"
+#include "global.h"
 
 #include "font.h"
 
@@ -10,8 +11,8 @@ static int ui_bg[2][4];
 
 #define UI_MSGSCR	(SUBSCR)
 #define UI_ASKSCR	(SUBSCR)
-#define UI_MENUSCR	(SUBSCR)
-#define UI_PROGSCR	(SUBSCR)
+#define UI_MENUSCR	(MAINSCR)
+#define UI_PROGSCR	(MAINSCR)
 
 #define STRBUF_LEN	(64)
 
@@ -154,6 +155,7 @@ void ui_reset(void)
 {
 	videoSetMode(MODE_0_2D);
 	videoSetModeSub(MODE_0_2D);
+
 	vramSetBankA(VRAM_A_MAIN_BG);
 	vramSetBankC(VRAM_C_SUB_BG);
 
@@ -308,94 +310,110 @@ bool ui_askf(const char *fmt, ...)
 }
 
 /* shamelessly ""inspired"" by gm9 */
-int ui_menu(int nopt, const char **opt, const char *str)
+int ui_menu(int nopt, const ui_menu_entry *opt, const char *str)
 {
-	vu16 *map;
-	bool redraw;
+	int opt_y, opt_xl, opt_xr, winsz, wins, wine, sel;
+	vu16 *map, *descmap;
 	size_t maxsw;
-	int opt_y, opt_x, winsz, wins, wine, ret;
+	bool redraw;
 
 	sassert(nopt > 0, "no options provided");
 
 	map = ui_map(UI_MENUSCR, BG_PROM);
+	descmap = ui_map(!UI_MENUSCR, BG_PROM);
 
 	ui_tilemap_set(map, CHR_OPAQUE);
+	ui_tilemap_set(descmap, CHR_OPAQUE);
 	opt_y = ui_drawstr_xcenter(map, 1, str) + 3;
 
 	maxsw = 0;
 	for (int i = 0; i < nopt; i++) {
 		size_t slen = 0;
-		while(opt[i][slen] != '\0') slen++;
+		while(opt[i].name[slen] != '\0') slen++;
 		if (maxsw < slen) maxsw = slen;
 	}
 
-	opt_x = ((TFB_WIDTH - maxsw) / 2) - 2;
-	if (opt_x < 0) opt_x = 0;
+	opt_xl = ((TFB_WIDTH - maxsw) / 2) - 2;
+	if (opt_xl & 1) opt_xl--;
+	if (opt_xl < 0) opt_xl = 0;
 
-	ret = 0;
+	opt_xr = ((TFB_WIDTH + maxsw) / 2) + 2;
+	if (opt_xr & 1) opt_xr--;
+	if (opt_xr >= TFB_WIDTH) opt_xr = TFB_WIDTH-1;
+
+	sel = 0;
 	winsz = (nopt > 20) ? 20 : nopt;
 	wins = 0;
 	wine = winsz;
 	redraw = true;
 	while(true) {
 		int pressed;
+		const char *description;
 
-		if (redraw) {
+		if (UNLIKELY(redraw)) {
+			redraw = false;
 			swiWaitForVBlank();
-			_ui_rect(map, CHR_OPAQUE, opt_x + 2, opt_y, maxsw, winsz);
+			_ui_rect(map, CHR_OPAQUE, opt_xl + 2, opt_y, maxsw, winsz);
 			for (int i = 0; i < winsz; i++) {
 				int opti = wins + i;
 				if (opti >= nopt) break;
-				ui_drawstr(map, opt_x + 2, opt_y + i, opt[opti]);
+				ui_drawstr(map, opt_xl + 2, opt_y + i, opt[opti].name);
 			}
-			redraw = false;
 		}
 
 		for (int i = 0; i < winsz; i++) {
 			int opti = wins + i;
-			ui_drawc(map, (ret==opti)?'>':' ', opt_x, opt_y + i);
+			ui_drawc(map, (sel==opti) ? '[' : ' ', opt_xl, opt_y + i);
+			ui_drawc(map, (sel==opti) ? ']' : ' ', opt_xr, opt_y + i);
 		}
 
+		description = opt[sel].desc;
+		if (description == NULL) description = "No description available";
+
+		/* TODO: clear map + draw description here */
+
 		pressed = ui_waitkey(KEY_UP | KEY_DOWN | KEY_LEFT | KEY_RIGHT | KEY_A | KEY_B);
-		if (pressed & KEY_UP) ret--;
-		else if (pressed & KEY_DOWN) ret++;
+		if (pressed & KEY_UP) sel--;
+		else if (pressed & KEY_DOWN) sel++;
 
 		if (pressed & KEY_LEFT) {
-			if (ret != wins) ret = wins;
-			else ret--;
+			if (sel != wins) sel = wins;
+			else sel--;
 		} else if (pressed & KEY_RIGHT) {
-			if (ret != wine-1) ret = wine-1;
-			else ret++;
+			if (sel != wine-1) sel = wine-1;
+			else sel++;
 		}
 
 		if (pressed & KEY_A) break;
 		else if (pressed & KEY_B) {
-			ret = -1;
+			sel = -1;
 			break;
 		}
 
-		if (ret < 0) ret = nopt-1;
-		else if (ret >= nopt) ret = 0;
+		if (sel < 0) sel = nopt-1;
+		else if (sel >= nopt) sel = 0;
 
-		if (ret >= wine) {
+		if (sel >= wine) {
 			wins = wine;
 			wine += winsz;
-			if (wine > nopt) wine = nopt;
+			wine = CLAMP(wine, 0, nopt);
 			redraw = true;
 		}
 
-		if (ret < wins) {
+		if (sel < wins) {
 			wine = wins;
 			wins -= winsz;
-			if (wins < 0) wins = 0;
+			wins = CLAMP(wins, 0, nopt);
 			redraw = true;
 		}
 	}
+
 	ui_tilemap_clr(map);
-	return ret;
+	ui_tilemap_clr(descmap);
+	return sel;
 }
 
-int ui_menuf(int nopt, const char **opt, const char *fmt, ...)
+int ui_menuf(int nopt, const ui_menu_entry *opt, const char *fmt, ...)
 {
 	UI_FORMAT_HELPER(fmt, str);
 	return ui_menu(nopt, opt, str);
@@ -406,7 +424,7 @@ void ui_progress(uint64_t cur, uint64_t tot, const char *un, const char *str)
 	vu16 *map;
 	int per, barc, y;
 
-	map = ui_map(UI_PROGSCR, BG_INFO);
+	map = ui_map(UI_PROGSCR, BG_PROM);
 
 	if (cur > tot) {
 		ui_tilemap_clr(map);

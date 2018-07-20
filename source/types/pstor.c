@@ -23,7 +23,7 @@ int pstor_init(pstor_t *ps, size_t bufsz, size_t max)
 	ps->lengths = (u8*)(wbuf + bufsz);
 	ps->cache = (char**)(wbuf + bufsz + max);
 
-	pstor_clear(ps);
+	pstor_reset(ps);
 	return 0;
 }
 
@@ -32,7 +32,7 @@ void pstor_free(pstor_t *ps)
 	free(ps->buf);
 }
 
-void pstor_clear(pstor_t *ps)
+void pstor_reset(pstor_t *ps)
 {
 	memset(ps->buf, 0, ps->buflen);
 	memset(ps->lengths, 0, ps->max);
@@ -42,34 +42,26 @@ void pstor_clear(pstor_t *ps)
 	ps->count = 0;
 }
 
-int pstor_cat(pstor_t *ps, const char *str)
+int pstor_add(pstor_t *ps, const char *str)
 {
-	size_t slen, totlen;
+	size_t slen;
 
 	if (ps == NULL || str == NULL) return -ERR_MEM;
 
 	slen = strlen(str);
-	totlen = slen + ps->lengths[ps->count];
+	if (slen >= 0x100 || (ps->lastc + slen) >= ps->buflen) return -ERR_MEM;
 
-	if (totlen > ps->buflen || totlen >= 0x100) return -ERR_MEM;
+	if ((ps->count % PSTOR_CACHE_DIV) == 0)
+		ps->cache[ps->count / PSTOR_CACHE_DIV] = &ps->buf[ps->lastc];
 
 	memcpy(&ps->buf[ps->lastc], str, slen);
 	ps->lastc += slen;
-	ps->lengths[ps->count] = totlen;
-	return 0;
-}
-
-int pstor_finish(pstor_t *ps)
-{
-	if (ps == NULL || ps->count == ps->max) return -ERR_MEM;
-
+	ps->lengths[ps->count] = slen;
 	ps->count++;
-	if ((ps->count % PSTOR_CACHE_DIV) == 0)
-		ps->cache[ps->count / PSTOR_CACHE_DIV] = &ps->buf[ps->lastc];
 	return 0;
 }
 
-int pstor_getpath(pstor_t *ps, char *out, size_t max, size_t i)
+int pstor_get(pstor_t *ps, char *out, size_t max, size_t i)
 {
 	size_t cache_idx, plen;
 	char *path;

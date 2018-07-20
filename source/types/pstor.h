@@ -34,16 +34,13 @@ int pstor_init(pstor_t *ps, size_t bufsz, size_t max);
 void pstor_free(pstor_t *ps);
 
 /* clears all paths */
-void pstor_clear(pstor_t *ps);
+void pstor_reset(pstor_t *ps);
 
 /* concatenate a string to the current path */
-int pstor_cat(pstor_t *ps, const char *str);
-
-/* move on to the next path */
-int pstor_finish(pstor_t *ps);
+int pstor_add(pstor_t *ps, const char *str);
 
 /* copy the `i`-th path to `out` */
-int pstor_getpath(pstor_t *ps, char *out, size_t max, size_t i);
+int pstor_get(pstor_t *ps, char *out, size_t max, size_t i);
 
 /* get the current amount of paths in the store */
 static inline size_t pstor_count(pstor_t *ps) {

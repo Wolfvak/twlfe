@@ -17,6 +17,6 @@ typedef struct {
 } fat_disk_ops;
 
 const fat_disk_ops *ff_get_disk_ops(int disk);
-int fat_mount(char drive, const fat_disk_ops *disk_ops, const char *icon);
+int fat_mount(char drive, const fat_disk_ops *disk_ops);
 
 #endif /* FAT_H__ */

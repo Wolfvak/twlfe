@@ -16,6 +16,8 @@ static struct {
 	int open_handles;
 } mount_state[VFS_MOUNTPOINTS];
 
+static int mounted_filesystems;
+
 static inline int _vfs_drvlet_to_idx(int drv)
 {
 	if (VFS_DRVVALID(drv)) return (drv - VFS_FIRSTMOUNT);
@@ -72,6 +74,7 @@ static void __attribute__((constructor)) __vfs_ctor(void)
 {
 	for (int i = VFS_FIRSTMOUNT; i <= VFS_LASTMOUNT; i++)
 		_vfs_reset_mount(i);
+	mounted_filesystems = 0;
 }
 
 
@@ -93,6 +96,11 @@ static int _vfs_check_lpath(const char *lp)
 
 
 
+int vfs_count(void)
+{
+	return mounted_filesystems;
+}
+
 int vfs_state(int drive)
 {
 	return _vfs_actives(drive);
@@ -111,6 +119,7 @@ int vfs_mount(int drive, mount_t *mnt_info)
 		_vfs_reset_mount(drive);
 	} else {
 		_vfs_set_mount(drive, mnt_info);
+		mounted_filesystems++;
 	}
 
 	return res;
@@ -130,6 +139,7 @@ int vfs_unmount(int drive)
 	res = VFS_CALL_OP(mnt, unmount, mnt);
 	if (!IS_ERR(res)) {
 		_vfs_reset_mount(drive);
+		mounted_filesystems--;
 	}
 
 	return res;
@@ -460,4 +470,26 @@ int vfs_dirnext(int dd, dirinf_t *next)
 	}
 
 	return ret;
+}
+
+
+/* simple ioctl wrappers */
+off_t vfs_ioctl_size(int drive)
+{
+	int res;
+	vfs_ioctl_t io;
+
+	res = vfs_ioctl(drive, VFS_IOCTL_SIZE, &io);
+	if (IS_ERR(res)) return res;
+	return io.size;
+}
+
+const char *vfs_ioctl_label(int drive)
+{
+	int res;
+	vfs_ioctl_t io;
+
+	res = vfs_ioctl(drive, VFS_IOCTL_LABEL, &io);
+	if (IS_ERR(res)) return "Invalid label";
+	return io.string;
 }

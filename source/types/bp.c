@@ -49,7 +49,7 @@ void bp_set(bp_t *bp, int i)
 	bp->count++;
 }
 
-void bp_clear(bp_t *bp, int i)
+void bp_clr(bp_t *bp, int i)
 {
 	if (UNLIKELY(!bp_tst(bp, i))) return;
 	bp->map[BP_IDX(i)] &= ~BP_MASK(i);
@@ -93,7 +93,7 @@ int bp_find_clr(bp_t *bp)
 	return ret + (i * BP_UBITS);
 }
 
-int bp_ffs(bp_t *bp)
+int bp_find_set(bp_t *bp)
 {
 	size_t i;
 	int ret;
