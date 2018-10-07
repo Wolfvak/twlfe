@@ -15,12 +15,20 @@
 typedef struct {
 	const fat_disk_ops *dops;
 	unsigned int drvn;
-	char label[12];
+	char label[16];
 
 	FATFS fs;
 } fat_state;
 
 static fat_state *states[FF_MAX_DISK] = {NULL};
+
+static inline void ff_make_path(char *o, int d, const char *p, bool f)
+{
+	*(o++) = '0' + d;
+	*(o++) = ':';
+	do { *(o++) = *(p++); } while(*p);
+	if (f && o[-1] == '/') o[-1] = '\0';
+}
 
 const fat_disk_ops *ff_get_disk_ops(int disk)
 {
@@ -39,7 +47,7 @@ static int _ff_vfs_mode(int vfs_mode)
 	return ret;
 }
 
-static int _ff_err(int err)
+static int _ff_err(unsigned int err)
 {
 	static const u8 ff_err_ttbl[] = {
 		[FR_OK] = 0,
@@ -60,13 +68,18 @@ static int _ff_err(int err)
 		[FR_TOO_MANY_OPEN_FILES] = ERR_MEM,
 		[FR_INVALID_PARAMETER] = ERR_ARG,
 	};
+	if (err >= ARRAY_SIZE(ff_err_ttbl))
+		return ERR_ARG;
 	return -ff_err_ttbl[err];
 }
 
 int fat_vfs_mount(mount_t *mnt)
 {
 	int res;
+	FATFS *fs;
 	fat_state *state = GET_PRIVDATA(mnt, fat_state*);
+
+	fs = &state->fs;
 
 	states[state->drvn] = state;
 	res = f_mount(&state->fs, FF_LOG_PATH(state->drvn), 1);
@@ -75,6 +88,8 @@ int fat_vfs_mount(mount_t *mnt)
 		states[state->drvn] = NULL;
 	} else {
 		f_getlabel(FF_LOG_PATH(state->drvn), state->label, NULL);
+		mnt->info.label = state->label;
+		mnt->info.size = (off_t)(fs->n_fatent - 2) * (off_t)fs->csize * FAT_SECT_SIZE;
 	}
 
 	return _ff_err(res);
@@ -93,26 +108,6 @@ int fat_vfs_unmount(mount_t *mnt)
 	return _ff_err(res);
 }
 
-int fat_vfs_ioctl(mount_t *mnt, int ctl, vfs_ioctl_t *data)
-{
-	fat_state *state = GET_PRIVDATA(mnt, fat_state*);
-	FATFS *fs = &state->fs;
-
-	switch(ctl) {
-		default:
-			return -ERR_ARG;
-
-		case VFS_IOCTL_SIZE:
-			data->size = (off_t)(fs->n_fatent - 2) * (off_t)(fs->csize) * FAT_SECT_SIZE;
-			break;
-
-		case VFS_IOCTL_LABEL:
-			data->string = state->label;
-			break;
-	}
-	return 0;
-}
-
 int fat_vfs_open(mount_t *mnt, vf_t *file, const char *path, int mode)
 {
 	int res;
@@ -123,7 +118,7 @@ int fat_vfs_open(mount_t *mnt, vf_t *file, const char *path, int mode)
 	ff_file = malloc(sizeof(*ff_file));
 	if (ff_file == NULL) return -ERR_MEM;
 
-	snprintf(ff_lpath, MAX_PATH, "%s%s", FF_LOG_PATH(state->drvn), path);
+	ff_make_path(ff_lpath, state->drvn, path, false);
 	res = f_open(ff_file, ff_lpath, _ff_vfs_mode(mode));
 	if (res == FR_OK) {
 		SET_PRIVDATA(file, ff_file);
@@ -151,12 +146,10 @@ int fat_vfs_close(mount_t *mnt, vf_t *file)
 int fat_vfs_unlink(mount_t *mnt, const char *path)
 {
 	int res;
-	size_t pathlen;
 	char ff_lpath[MAX_PATH + 1];
 	fat_state *state = GET_PRIVDATA(mnt, fat_state*);
 
-	pathlen = snprintf(ff_lpath, MAX_PATH, "%s%s", FF_LOG_PATH(state->drvn), path);
-	if (ff_lpath[pathlen-1] == '/') ff_lpath[pathlen-1] = '\0';
+	ff_make_path(ff_lpath, state->drvn, path, true);
 
 	res = f_unlink(ff_lpath);
 	return _ff_err(res);
@@ -165,15 +158,11 @@ int fat_vfs_unlink(mount_t *mnt, const char *path)
 int fat_vfs_rename(mount_t *mnt, const char *oldp, const char *newp)
 {
 	int res;
-	size_t pathlen;
 	char ff_lop[MAX_PATH + 1], ff_lnp[MAX_PATH + 1];
 	fat_state *state = GET_PRIVDATA(mnt, fat_state*);
 
-	pathlen = snprintf(ff_lop, MAX_PATH, "%s%s", FF_LOG_PATH(state->drvn), oldp);
-	if (ff_lop[pathlen-1] == '/') ff_lop[pathlen-1] = '\0';
-
-	pathlen = snprintf(ff_lnp, MAX_PATH, "%s%s", FF_LOG_PATH(state->drvn), newp);
-	if (ff_lnp[pathlen-1] == '/') ff_lnp[pathlen-1] = '\0';
+	ff_make_path(ff_lop, state->drvn, oldp, true);
+	ff_make_path(ff_lnp, state->drvn, newp, true);
 
 	res = f_rename(ff_lop, ff_lnp);
 	return _ff_err(res);
@@ -214,12 +203,10 @@ off_t fat_vfs_size(mount_t *mnt, vf_t *file)
 int fat_vfs_mkdir(mount_t *mnt, const char *path)
 {
 	int res;
-	size_t pathlen;
 	char ff_lpath[MAX_PATH + 1];
 	fat_state *state = GET_PRIVDATA(mnt, fat_state*);
 
-	pathlen = snprintf(ff_lpath, MAX_PATH, "%s%s", FF_LOG_PATH(state->drvn), path);
-	if (ff_lpath[pathlen-1] == '/') ff_lpath[pathlen-1] = '\0';
+	ff_make_path(ff_lpath, state->drvn, path, true);
 
 	res = f_mkdir(ff_lpath);
 	return _ff_err(res);
@@ -229,15 +216,13 @@ int fat_vfs_diropen(mount_t *mnt, vf_t *dir, const char *path)
 {
 	DIR *dp;
 	int res;
-	size_t pathlen;
 	char ff_lpath[MAX_PATH + 1];
 	fat_state *state = GET_PRIVDATA(mnt, fat_state*);
 
 	dp = malloc(sizeof(*dp));
 	if (dp == NULL) return -ERR_MEM;
 
-	pathlen = snprintf(ff_lpath, MAX_PATH, "%s%s", FF_LOG_PATH(state->drvn), path);
-	if (ff_lpath[pathlen-1] == '/') ff_lpath[pathlen-1] = '\0';
+	ff_make_path(ff_lpath, state->drvn, path, true);
 
 	res = f_opendir(dp, ff_lpath);
 	if (res == FR_OK) {
@@ -291,7 +276,6 @@ int fat_vfs_dirnext(mount_t *mnt, vf_t *dir, dirinf_t *next)
 static const vfs_ops_t fat_ops = {
 	.mount = fat_vfs_mount,
 	.unmount = fat_vfs_unmount,
-	.ioctl = fat_vfs_ioctl,
 
 	.open = fat_vfs_open,
 	.close = fat_vfs_close,
@@ -317,9 +301,8 @@ int fat_mount(char drive, const fat_disk_ops *disk_ops)
 	fat_state *state;
 
 	/* find a free spot */
-	for (idx = 0; idx < FF_MAX_DISK; idx++) {
+	for (idx = 0; idx < FF_MAX_DISK; idx++)
 		if (states[idx] == NULL) break;
-	}
 	if (idx == FF_MAX_DISK) return -ERR_DEV;
 
 	mnt = malloc(sizeof(*mnt));

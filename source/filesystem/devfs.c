@@ -9,30 +9,15 @@
 
 int devfs_vfs_mount(mount_t *mnt)
 {
+	devfs_t *dfs = GET_PRIVDATA(mnt, devfs_t*);
+	mnt->info.label = dfs->label;
+	mnt->info.size = VFS_SIZE_MAX;
 	return 0;
 }
 
 int devfs_vfs_unmount(mount_t *mnt)
 {
 	free(mnt);
-	return 0;
-}
-
-int devfs_vfs_ioctl(mount_t *mnt, int ctl, vfs_ioctl_t *data)
-{
-	devfs_t *dfs = GET_PRIVDATA(mnt, devfs_t*);
-	switch(ctl) {
-		default:
-			return -ERR_ARG;
-
-		case VFS_IOCTL_SIZE:
-			data->size = 0;
-			break;
-
-		case VFS_IOCTL_LABEL:
-			data->string = dfs->label;
-			break;
-	}
 	return 0;
 }
 
@@ -131,7 +116,6 @@ int devfs_vfs_dirnext(mount_t *mnt, vf_t *dir, dirinf_t *next)
 static const vfs_ops_t devfs_ops = {
 	.mount = devfs_vfs_mount,
 	.unmount = devfs_vfs_mount,
-	.ioctl = devfs_vfs_ioctl,
 
 	.open = devfs_vfs_open,
 	.close = devfs_vfs_close,

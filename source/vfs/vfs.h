@@ -59,14 +59,14 @@
 typedef signed long long off_t;
 #define VFS_SIZE_MAX ((off_t)0x7FFFFFFFFFFFFFFFULL)
 
-typedef union {
+typedef struct {
+	const char *label;
 	off_t size;
-	const char *string;
-	const void *data;
-} vfs_ioctl_t;
+} vfs_info_t;
 
 typedef struct {
 	const void *ops;	/**< Filesystem operations */
+	vfs_info_t info;	/**< Filesystem information */
 	int caps;			/**< Capability bitmask */
 
 	void *priv;
@@ -91,7 +91,6 @@ typedef struct {
 typedef struct {
 	int (*mount)(mount_t *mnt);
 	int (*unmount)(mount_t *mnt);
-	int (*ioctl)(mount_t *mnt, int ctl, vfs_ioctl_t *data);
 
 	int (*open)(mount_t *mnt, vf_t *file, const char *path, int mode);
 	int (*close)(mount_t *mnt, vf_t *file);
@@ -121,17 +120,11 @@ enum {
 	VFS_DIR		= BIT(5),			/**< Entity is a dir */
 };
 
-enum {
-	VFS_IOCTL_SIZE,
-	VFS_IOCTL_LABEL,
-};
-
-int vfs_count(void);
+int vfs_mountedcnt(void);
 int vfs_state(int drive);
 
 int vfs_mount(int drive, mount_t *mnt);
 int vfs_unmount(int drive);
-int vfs_ioctl(int drive, int ctl, vfs_ioctl_t *data);
 
 int vfs_open(const char *path, int mode);
 int vfs_close(int fd);
@@ -148,7 +141,6 @@ int vfs_diropen(const char *path);
 int vfs_dirclose(int dd);
 int vfs_dirnext(int dd, dirinf_t *next);
 
-off_t vfs_ioctl_size(int drive);
-const char *vfs_ioctl_label(int drive);
+const vfs_info_t *vfs_info(int drive);
 
 #endif // VFS_H__

@@ -97,7 +97,7 @@ static int _vfs_check_lpath(const char *lp)
 
 
 
-int vfs_count(void)
+int vfs_mountedcnt(void)
 {
 	return mounted_filesystems;
 }
@@ -144,16 +144,6 @@ int vfs_unmount(int drive)
 	}
 
 	return res;
-}
-
-int vfs_ioctl(int drive, int ctl, vfs_ioctl_t *data)
-{
-	mount_t *mnt;
-
-	if (!_vfs_mounted(drive)) return -ERR_NOTREADY;
-	mnt = _vfs_mount(drive);
-
-	return VFS_CALL_OP(mnt, ioctl, mnt, ctl, data);
 }
 
 int vfs_open(const char *path, int mode)
@@ -473,25 +463,11 @@ int vfs_dirnext(int dd, dirinf_t *next)
 	return ret;
 }
 
-
-/* simple ioctl wrappers */
-off_t vfs_ioctl_size(int drive)
+const vfs_info_t *vfs_info(int drive)
 {
-	int res;
-	vfs_ioctl_t io;
+	if (_vfs_mounted(drive)) {
+		return &(mount_state[_vfs_drvlet_to_idx(drive)].mount->info);
+	}
 
-	res = vfs_ioctl(drive, VFS_IOCTL_SIZE, &io);
-	if (IS_ERR(res)) return res;
-	return io.size;
-}
-
-const char *vfs_ioctl_label(int drive)
-{
-	int res;
-	vfs_ioctl_t io;
-
-	res = vfs_ioctl(drive, VFS_IOCTL_LABEL, &io);
-	if (IS_ERR(res)) return "No filesystem";
-	else if (io.string[0] == '\0') return "No label";
-	return io.string;
+	return NULL;
 }

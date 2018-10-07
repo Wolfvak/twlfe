@@ -29,7 +29,7 @@ static devfs_entry_t memfs_entries[] = {
 
 static devfs_t memfs = {
     .dev_entry = memfs_entries,
-    .n_entries = sizeof(memfs_entries)/sizeof(*memfs_entries),
+    .n_entries = ARRAY_SIZE(memfs_entries),
     .label = "Memory",
     .dev_read = memfs_read,
     .dev_write = memfs_write,

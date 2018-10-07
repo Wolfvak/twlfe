@@ -22,6 +22,8 @@
 
 #define CLAMP(x, a, b)		((x) < (a) ? (a) : (((x) > (b) ? (b) : (x))))
 
+#define ARRAY_SIZE(x)		(sizeof(x) / sizeof(*(x)))
+
 #define PROCESS_KEYS(keys) \
 	for (typeof((keys)) _k = keys, _kproc = 1; _k && _kproc; _k &= ~BIT(31 - __builtin_clz(_k))) \
 	switch(_k & BIT(31 - __builtin_clz(_k)))

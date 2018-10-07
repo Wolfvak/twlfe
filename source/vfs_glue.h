@@ -5,18 +5,6 @@
 
 #include <nds.h>
 
-/*
- * copies file `path` to `new` and shows the progress
- */
-int copy_file_ui(const char *path, const char *new);
-
-/*
- * attempts to rename the file from `old` to `new` and
- * if that fails *AND* `fallback` is set, it tries to
- * copy the file (with progress), then remove the original
- */
-int move_file_ui(const char *old, const char *new, bool fallback);
-
 /* null terminates the last '/' char */
 size_t path_basedir(char *path);
 
